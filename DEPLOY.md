@@ -35,22 +35,29 @@ deep link does not 404.
 Linking the GitHub repository in the Vercel dashboard instead gives you a deploy on every
 push, which is worth doing once the repository exists.
 
-## What gets deployed, and what deliberately does not
+## Playing the deployed build, and why it takes a flag
 
-The production build is **`build:platform`**, not `build`. It sets `VITE_DEMO_BOT=0`,
-which drops the `mockHost` chunk from the bundle entirely — verified by checking that no
-`mockHost-*.js` is emitted into `dist/assets/`.
+The deployment ships the demo opponent so the game can be tested end to end, but you
+have to ask for it:
 
-That matters. The mock host *imitates* the contract: it deals real-looking dice, keeps
-score and settles a pot, none of it on chain. Embedded in chain.wtf it could never
-appear (it only offers itself when the app is the top window), but a deployed URL is
-something people open directly — and somebody playing a convincing fake while believing
-their buy-in is escrowed is the one failure worth engineering against. So it is not in
-the bundle at all, rather than merely hidden.
+```
+https://backgammon-chaingames.vercel.app/?demo=1
+```
 
-If you want a playable demo link for showing the game to people, deploy a second Vercel
-project from the same repository with the build command set to plain `npm run build`,
-and keep it on a URL that is obviously a demo.
+Without the flag the bare URL shows only "Loading…", which is the correct behaviour for
+an iframe guest with no host to talk to. Embedded in chain.wtf the demo can never appear
+at all — it only offers itself when the app is the top window.
+
+The flag exists because the mock host imitates the contract closely: real-looking dice, a
+running score, a pot that settles. That is what makes it useful for testing and exactly
+what makes it risky on a public URL — somebody could play a convincing fake believing
+their buy-in was escrowed. So it cannot be reached by accident, and while it is running a
+fixed banner across the bottom of the screen says **"Demo — local test opponent, no
+chain, no wallet, no real money"** for the whole session.
+
+To ship a build with the bot removed from the bundle entirely rather than gated, use
+`npm run build:platform` (`VITE_DEMO_BOT=0`); no `mockHost-*.js` is emitted at all.
+That is the right build once real matches are running on chain.
 
 ## Headers
 

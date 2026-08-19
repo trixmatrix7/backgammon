@@ -1432,3 +1432,40 @@ body { overflow: hidden; }
 /* The kit's button face is drawn for one or two short words; this label is four, and
    it wrapped to three lines inside a fixed face. */
 .result-actions .neo-btn > span { white-space: nowrap; }
+
+/* ── the demo marker ──────────────────────────────────────────────────────────
+   Shown for the whole time the mock host is driving. Fixed and click-through, so
+   it can neither shift the board nor block anything under it — the board's
+   stability was hard enough won. */
+
+.demo-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 18px;
+  background: var(--hot);
+  color: var(--paper);
+  border: 2px solid var(--ink);
+  border-bottom: 0;
+  box-shadow: 0 -3px 0 rgba(13, 10, 24, 0.55);
+  font-family: var(--ui);
+  white-space: nowrap;
+}
+.demo-banner b {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.demo-banner span {
+  font-size: 12px;
+  opacity: 0.92;
+}
+@media (max-width: 560px) {
+  .demo-banner span { display: none; }
+}

@@ -60,13 +60,18 @@ export function useHost() {
   // TOP window (opened standalone — not embedded in chain.wtf). Inside the chain.wtf iframe
   // `window.parent !== window`, so this is false and the on-chain integration is untouched.
   const standalone = typeof window !== "undefined" && window.parent === window && window.top === window;
-  // One switch that removes the bot entirely: build with `VITE_DEMO_BOT=0` and this is a
-  // compile-time false, so Vite drops the dynamic import of `MockHost` and the bot never
-  // reaches the bundle. That is the switch to throw for the platform build — the
-  // standalone allowance above is generous on purpose for local work, and generous is
-  // not what you want in production.
+  // `VITE_DEMO_BOT=0` removes the bot from the bundle entirely (see `startMock`).
   const botBuilt = import.meta.env.VITE_DEMO_BOT !== "0";
-  const demoAllowed = botBuilt && (import.meta.env.DEV || standalone);
+
+  // In a deployed build the demo has to be ASKED for: `?demo=1`. The deployment exists so
+  // the game can be tested end to end, but the mock host imitates the contract closely
+  // enough — real-looking dice, a score, a pot that settles — that somebody arriving at
+  // the bare URL could take a fake match for a real one. Requiring the flag means nobody
+  // reaches it by accident, and `DemoBanner` makes sure nobody who does reach it is in
+  // any doubt. Local dev needs no flag.
+  const demoAsked =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
+  const demoAllowed = botBuilt && (import.meta.env.DEV || (standalone && demoAsked));
   const debug: DebugControls | undefined = demoAllowed
     ? {
         active: mockActive,

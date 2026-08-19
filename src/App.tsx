@@ -1,6 +1,7 @@
 import { useHost } from "./sdk/useHost";
 import { MatchScreen } from "./ui/MatchScreen";
 import { CreateTable, ResultScreen, WaitingRoom } from "./ui/screens";
+import { DemoBanner } from "./ui/DemoBanner";
 import { Sound, loadManifest } from "./sound/sounds";
 
 /**
@@ -108,6 +109,7 @@ export function App() {
   return (
     <div className="shell">
       {screen}
+      {debug?.active && <DemoBanner />}
       {notice && <div className="toast">{notice}</div>}
     </div>
   );
