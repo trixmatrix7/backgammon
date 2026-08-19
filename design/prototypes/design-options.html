@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chain Backgammon — 20 HUD &amp; playfield options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   CHAIN BACKGAMMON — 20 design options
+   --------------------------------------------------------------------------
+   Every option below is the SAME markup and the SAME live board. Only the
+   design class on the stage changes. That is deliberate: it means what you
+   are choosing between is real, buildable layouts — not pictures of layouts —
+   and whichever you pick can be built without re-deciding anything.
+
+   Base language is the Chain / Ludo family: #121212, brand yellow #FFE168 for
+   exactly one primary action, Poppins (italic uppercase extrabold on buttons),
+   tabular numbers, gradient cards with a black border and a white sheen.
+   ========================================================================== */
+
+:root{
+  --c-bg:#121212; --c-primary:#ffe168; --c-on-primary:#000;
+  --c-card-from:#212121; --c-card-to:#171717; --c-card-border:#000;
+  --c-sheen:rgba(255,255,255,.22); --c-edge:#292929; --c-rim:#080808;
+  --c-fancy-from:#313131; --c-fancy-to:#181818;
+  --c-sec-bg:#2a2a2a; --c-sec-hover:#333; --c-sec-fg:rgba(255,255,255,.8);
+  --c-row-bg:#0f0f0f; --c-dim:rgba(255,255,255,.5);
+  --c-pill-bg:rgba(255,255,255,.08); --c-pill-border:rgba(255,255,255,.2);
+  --c-tray:inset 1px 1px 2px rgba(0,0,0,.55), inset -1px -1px 1px rgba(255,255,255,.045), 0 1px 0 0 #292929;
+  --c-font:"Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, monospace;
+  --red:#e5484d; --green:#46a758; --blue:#3b9eff;
+  --go:#a9e938;                       /* move markers on the board — this colour, nowhere else */
+  --card:linear-gradient(180deg, var(--c-card-from), var(--c-card-to));
+  --card-shadow:inset 0 1px 0 0 var(--c-sheen), 0 1px 0 0 var(--c-edge), 0 8px 22px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box; margin:0}
+body{
+  background:var(--c-bg); color:#fff; font-family:var(--c-font);
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; font-style:normal}
+
+/* ── page chrome ─────────────────────────────────────────────────────────── */
+
+.page{max-width:1360px; margin:0 auto; padding:38px 24px 90px}
+.masthead{padding-bottom:26px; border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:8px}
+.masthead h1{
+  font-weight:900; text-transform:uppercase; letter-spacing:-.03em; line-height:.94;
+  font-size:clamp(30px,5.4vw,50px);
+}
+.masthead h1 em{font-style:normal; color:var(--c-primary)}
+.masthead p{margin-top:14px; max-width:70ch; font-size:14.5px; line-height:1.72; color:rgba(255,255,255,.62)}
+.masthead p b{color:#fff; font-weight:600}
+
+.legend{display:flex; flex-wrap:wrap; gap:8px; margin-top:20px}
+.legend span{
+  font-size:11px; font-weight:600; letter-spacing:.04em; color:var(--c-dim);
+  background:var(--c-pill-bg); border-top:1px solid var(--c-pill-border);
+  border-radius:7px; padding:5px 10px;
+}
+.legend span i{font-style:normal; color:#fff}
+
+/* sticky index */
+.jump{
+  position:sticky; top:0; z-index:40; display:flex; flex-wrap:wrap; gap:5px;
+  padding:12px 0 12px; margin-bottom:10px;
+  background:linear-gradient(180deg, var(--c-bg) 72%, rgba(18,18,18,0));
+}
+.jump a{
+  font-size:11.5px; font-weight:700; text-decoration:none; color:var(--c-sec-fg);
+  background:var(--c-sec-bg); border-radius:8px; padding:7px 11px; white-space:nowrap;
+  transition:background .12s, color .12s;
+}
+.jump a:hover{background:var(--c-primary); color:var(--c-on-primary)}
+.jump a b{font-family:var(--mono); font-weight:700; opacity:.55; margin-right:5px}
+
+/* one option block */
+.opt{padding:40px 0 6px; scroll-margin-top:64px}
+.opt + .opt{border-top:1px solid rgba(255,255,255,.07)}
+.opt-head{display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; margin-bottom:20px}
+.opt-no{
+  font-family:var(--mono); font-weight:700; font-size:34px; line-height:1;
+  color:rgba(255,255,255,.2); flex:none;
+}
+.opt-id{min-width:0; flex:1 1 320px}
+.opt-id h2{font-size:23px; font-weight:800; letter-spacing:-.02em}
+.opt-id p{margin-top:7px; font-size:13.5px; line-height:1.65; color:rgba(255,255,255,.6); max-width:74ch}
+.opt-tags{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.tag{
+  font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--c-dim); background:var(--c-pill-bg); border-top:1px solid var(--c-pill-border);
+  border-radius:7px; padding:5px 9px; white-space:nowrap;
+}
+.tag.set{color:#fff}
+.opt-moves{
+  margin-top:14px; padding:11px 14px; border-radius:11px;
+  background:var(--c-row-bg); border:1px solid var(--c-rim); box-shadow:var(--c-tray);
+  font-size:12.5px; line-height:1.6; color:rgba(255,255,255,.68);
+}
+.opt-moves b{color:var(--c-primary); font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:10.5px; display:block; margin-bottom:3px}
+
+/* The stage is a fixed 16:10 window so all twenty are compared like for like. */
+.frame{
+  position:relative; width:100%; aspect-ratio:16/10; border-radius:16px; overflow:hidden;
+  border:1px solid var(--c-rim); background:#0b0b0b; box-shadow:0 22px 60px rgba(0,0,0,.55);
+  container-type:inline-size;
+}
+.stage{position:absolute; inset:0; display:grid; font-size:16px}
+/* Everything inside a stage sizes in cqw, so a design reads identically at any width. */
+.stage{--u:1cqw}
+
+/* ==========================================================================
+   THE BOARD — shared by all twenty
+   ========================================================================== */
+
+/* The board carries its own container, so every offset drawn on top of it (chips, markers, the
+   solids) is a percentage of the PICTURE rather than of the screen — which is the only way the
+   same layer can be correct in all twenty layouts. `--bh` is the height budget a design gives
+   the board, in frame-widths; the frame is locked to 16:10 so 62.5 of them is full height. */
+.bd{
+  position:relative; container-type:inline-size; line-height:0;
+  align-self:center; justify-self:center;
+  width:min(100%, calc(var(--bh, 40cqw) * var(--ar, 1.35)));
+}
+.bd img.case{display:block; width:100%; height:auto; border-radius:.6cqw; -webkit-user-drag:none}
+.bd .layer{position:absolute; inset:0}
+.chip{position:absolute; transform:translate(-50%,-50%); pointer-events:none;
+  filter:drop-shadow(.12cqw .2cqw .16cqw rgba(0,0,0,.7)) drop-shadow(.3cqw .6cqw .9cqw rgba(0,0,0,.3))}
+.chip img{display:block; width:100%; filter:sepia(.12) saturate(1.05) brightness(.955) contrast(1.03)}
+.chip.sel{filter:drop-shadow(.12cqw .2cqw .16cqw rgba(0,0,0,.7)) drop-shadow(0 0 .55cqw rgba(169,233,56,.45))}
+/* landing spot: a hatched silhouette of the point itself, outlined by four drop-shadows —
+   a border would be cut away by the clip-path. No number: the die is in the move tray. */
+.mark{position:absolute; opacity:.9; pointer-events:none;
+  background:repeating-linear-gradient(45deg, rgba(169,233,56,.45) 0 .3cqw, rgba(169,233,56,.03) .3cqw 1.15cqw);
+  filter:drop-shadow(.09cqw 0 0 var(--go)) drop-shadow(-.09cqw 0 0 var(--go))
+         drop-shadow(0 .09cqw 0 var(--go)) drop-shadow(0 -.09cqw 0 var(--go))}
+.well{position:absolute; overflow:hidden; border-radius:.5cqw}
+.well .bear{position:absolute; transform:translate(-50%,-50%) rotate(var(--rr,0deg));
+  filter:drop-shadow(0 .18cqw .18cqw rgba(0,0,0,.9))}
+.well .bear img{display:block; width:100%}
+.well .shade{position:absolute; inset:0; border-radius:.5cqw;
+  box-shadow:inset 0 .7cqw .85cqw -.4cqw rgba(0,0,0,.9), inset 0 -.3cqw .4cqw -.28cqw rgba(0,0,0,.5),
+    inset .42cqw 0 .7cqw -.42cqw rgba(0,0,0,.8), inset -.42cqw 0 .7cqw -.42cqw rgba(0,0,0,.8)}
+
+/* dice + cube, as real CSS-3D solids: one design for every board, black piano
+   lacquer with silver pips; the cube solid silver with the number engraved dark. */
+.d3{position:absolute; transform:translate(-50%,-50%); filter:drop-shadow(.25cqw .8cqw .7cqw rgba(0,0,0,.6))}
+.d3 .cube{display:block; position:relative; width:100%; height:100%; transform-style:preserve-3d;
+  transform:rotateX(-64deg) rotateY(var(--ry,26deg))}
+.d3 .f{position:absolute; inset:0; border-radius:14%; box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.d3 .f.bk{transform:rotateY(180deg) translateZ(var(--h)); background:#0a0a0d}
+.d3 .f.rt{transform:rotateY(90deg) translateZ(var(--h)); background:linear-gradient(180deg,#151518,#060608)}
+.d3 .f.bt{transform:rotateX(-90deg) translateZ(var(--h)); background:#060608}
+.d3 .f.fr{transform:translateZ(var(--h)); background:linear-gradient(180deg,#26262b,#0d0d10)}
+.d3 .f.sd{transform:rotateY(-90deg) translateZ(var(--h)); background:linear-gradient(180deg,#1a1a1e,#08080b)}
+.d3 .f.top{transform:rotateX(90deg) translateZ(var(--h));
+  background:linear-gradient(118deg, transparent 32%, rgba(255,255,255,.19) 43%, rgba(255,255,255,.03) 50%, transparent 58%),
+    radial-gradient(120% 120% at 32% 22%, #4a4a52 0%, #232327 52%, #121215 100%)}
+.d3 .f i{position:absolute; width:16%; height:16%; border-radius:50%; transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 36% 30%, #f4f6f8, #aeb4bc 62%, #878d95 100%);
+  box-shadow:inset 0 -1px 1px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.35)}
+.d3 .f.fr i, .d3 .f.sd i{filter:brightness(.42)}
+.d3.spent{filter:drop-shadow(.2cqw .5cqw .5cqw rgba(0,0,0,.45)) brightness(.5) grayscale(.35)}
+.d3.cubie{perspective:640px; perspective-origin:50% 38%}
+.d3.cubie .cube{transform:translateZ(calc(var(--h) * -1.5)) rotateX(-70deg) rotateY(-14deg)}
+.d3.cubie .f{border-radius:9%; box-shadow:inset 0 0 0 1px rgba(255,255,255,.36)}
+.d3.cubie .f.top{display:grid; place-items:center;
+  background:linear-gradient(118deg, transparent 26%, rgba(255,255,255,.75) 41%, rgba(255,255,255,.25) 49%, transparent 60%),
+    radial-gradient(130% 130% at 30% 20%, #fff 0%, #eef1f4 30%, #d3d9df 62%, #aab0b7 100%)}
+.d3.cubie .f.fr{background:linear-gradient(180deg,#9ba1a8,#767b82 70%,#63686e)}
+.d3.cubie .f.sd{background:linear-gradient(180deg,#868b92,#5f646a)}
+.d3.cubie .f.rt{background:linear-gradient(180deg,#aab0b7,#7c8188)}
+.d3.cubie .f.bk{background:#9ba1a8}
+.d3.cubie .f.bt{background:#6b7076}
+.d3.cubie .f.top b{font:700 1em var(--mono); line-height:1; letter-spacing:-.045em; color:#33363b;
+  font-variant-numeric:tabular-nums; text-shadow:0 -1px 1px rgba(0,0,0,.35), 0 1.5px 0 rgba(255,255,255,.9)}
+
+/* ==========================================================================
+   HUD ATOMS — the vocabulary every design re-arranges
+   Base look = Chain family. Each design class below overrides what it needs.
+   ========================================================================== */
+
+.stage .pot, .stage .p, .stage .banner, .stage .tray, .stage .aux{font-size:calc(var(--u) * 1)}
+
+/* pot */
+.pot{display:flex; flex-direction:column; gap:.15cqw; padding:.75cqw 1.15cqw; border-radius:.85cqw;
+  background:var(--card); border:1px solid var(--c-card-border); box-shadow:var(--card-shadow)}
+.pot .k{font-size:.72cqw; font-weight:700; letter-spacing:.14em; color:var(--c-dim); text-transform:uppercase}
+.pot .v{font-size:1.55cqw; font-weight:800; color:var(--c-primary); font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+.pot .s{font-size:.7cqw; font-weight:500; color:var(--c-dim); white-space:nowrap}
+.coin{display:inline-block; width:.85em; height:.85em; border-radius:50%; vertical-align:-.03em;
+  background:linear-gradient(180deg,#ffe168,#c9a63b); box-shadow:inset 0 0 0 .07em rgba(0,0,0,.35)}
+
+/* player panel */
+.p{display:flex; flex-direction:column; gap:.6cqw; padding:.9cqw 1.05cqw; border-radius:.9cqw;
+  background:var(--card); border:1px solid var(--c-card-border); box-shadow:var(--card-shadow);
+  transition:opacity .2s, box-shadow .2s}
+.p.off{opacity:.5}
+.p .top{display:flex; align-items:center; gap:.6cqw; min-width:0}
+.p .ava{width:2cqw; height:2cqw; flex:none; border-radius:50%; display:grid; place-items:center;
+  background:radial-gradient(120% 120% at 34% 24%,#2b2b2b,#131313 78%);
+  box-shadow:0 0 0 1px #000, inset 0 1px 0 rgba(255,255,255,.12);
+  font-size:.95cqw; font-weight:800; font-style:italic; color:rgba(255,255,255,.65)}
+.p.on .ava{box-shadow:0 0 0 1px #000, 0 0 0 .16cqw var(--c-primary)}
+.p .who{min-width:0; flex:1}
+.p .nm{display:block; font-size:1.05cqw; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.p .sub{display:block; margin-top:.1cqw; font-size:.68cqw; font-weight:600; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--c-dim); white-space:nowrap}
+.p .disc{width:.85cqw; height:.85cqw; border-radius:50%; flex:none; box-shadow:inset 0 0 0 .07cqw rgba(0,0,0,.5)}
+.p .disc.w{background:linear-gradient(180deg,#f4f5f7,#c9ccd1)}
+.p .disc.b{background:linear-gradient(180deg,#3a3a3f,#141416)}
+.p .clock{font-family:var(--mono); font-weight:700; font-size:.95cqw; color:rgba(255,255,255,.75)}
+.p.on .clock{color:#fff}
+.p .clock.low{color:#ff8a7d}
+.p .stats{display:flex; gap:.5cqw}
+.p .stat{flex:1; min-width:0; padding:.5cqw .6cqw; border-radius:.6cqw;
+  background:var(--c-row-bg); border:1px solid var(--c-rim); box-shadow:var(--c-tray)}
+.p .stat .k{display:block; font-size:.62cqw; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--c-dim)}
+.p .stat .v{display:block; margin-top:.15cqw; font-family:var(--mono); font-weight:700; font-size:1.15cqw; color:#fff}
+.p .stat .v small{font-size:.62em; color:var(--c-dim)}
+.p .lad{display:flex; gap:.12cqw; height:.45cqw}
+.p .lad i{flex:1; border-radius:.06cqw; background:rgba(255,255,255,.13)}
+.p .lad i.on{background:var(--c-primary)}
+.p .score{display:flex; align-items:baseline; gap:.35cqw; font-family:var(--mono); font-weight:700}
+.p .score b{font-size:1.3cqw; color:#fff}
+.p .score span{font-size:.75cqw; color:var(--c-dim)}
+/* the cube badge only appears on the card of whoever owns it */
+.p .cube{display:inline-flex; align-items:center; gap:.3cqw; align-self:flex-start;
+  padding:.28cqw .55cqw; border-radius:.45cqw; background:var(--c-pill-bg);
+  border-top:1px solid var(--c-pill-border); font-size:.62cqw; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--c-dim)}
+.p .cube b{font-family:var(--mono); font-size:.8cqw; color:#fff; letter-spacing:0}
+
+/* turn banner */
+.banner{display:inline-flex; align-items:center; gap:.7cqw; padding:.62cqw 1.1cqw; border-radius:.8cqw;
+  background:var(--card); border:1px solid var(--c-card-border); box-shadow:var(--card-shadow);
+  font-size:.95cqw; font-weight:600; white-space:nowrap}
+.banner::before{content:""; flex:none; width:.32cqw; height:1.25cqw; border-radius:99px;
+  background:var(--c-primary); box-shadow:0 0 .7cqw var(--c-primary)}
+.banner b{font-weight:800}
+
+/* move tray — what the throw still owes (two, or four on a double) */
+.tray{display:flex; align-items:center; gap:.6cqw}
+.tray .lbl{font-size:.66cqw; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--c-dim)}
+.tray .toks{display:flex; gap:.3cqw}
+.tok{position:relative; width:1.75cqw; height:1.75cqw; border-radius:.4cqw; flex:none;
+  background:linear-gradient(118deg, transparent 30%, rgba(255,255,255,.14) 44%, transparent 58%),
+    radial-gradient(120% 120% at 32% 22%, #45454d 0%, #222226 52%, #101013 100%);
+  box-shadow:0 .16cqw .4cqw rgba(0,0,0,.65), inset 0 -.1cqw .17cqw rgba(0,0,0,.7), inset 0 .05cqw .05cqw rgba(255,255,255,.2)}
+.tok i{position:absolute; width:.32cqw; height:.32cqw; border-radius:50%; transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 36% 30%, #f4f6f8, #a9afb7 70%)}
+.tok.used{filter:brightness(.4); transform:scale(.9)}
+
+/* buttons — exactly two tiers, plus danger */
+.cta{font-family:var(--c-font); font-weight:800; font-style:italic; text-transform:uppercase;
+  letter-spacing:-.01em; font-size:1.05cqw; padding:.85cqw 1.9cqw; border:none; border-radius:.75cqw;
+  background:var(--c-primary); color:var(--c-on-primary); cursor:pointer; white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -.2cqw .55cqw rgba(255,255,255,.55),
+    0 .6cqw 1.3cqw -.6cqw rgba(255,225,104,.9)}
+.btn{font-family:var(--c-font); font-weight:700; font-style:italic; text-transform:uppercase;
+  font-size:.8cqw; padding:.6cqw 1.05cqw; border:none; border-radius:.6cqw;
+  background:var(--c-sec-bg); color:var(--c-sec-fg); cursor:pointer; white-space:nowrap}
+.btn.dgr{color:#ffb3aa}
+.aux{display:flex; align-items:center; gap:.45cqw}
+
+/* the veil used by a couple of designs to show a moment on top of the table */
+.hint{position:absolute; left:50%; bottom:6%; transform:translateX(-50%); z-index:9;
+  padding:.5cqw 1cqw; border-radius:.6cqw; background:rgba(10,10,10,.88);
+  font-size:.8cqw; font-weight:600; color:rgba(255,255,255,.8); white-space:nowrap}
+
+/* ==========================================================================
+   LAYOUT A — the family default. Every design starts from this and moves.
+   ========================================================================== */
+.stage{
+  grid-template-columns:minmax(0,19cqw) minmax(0,1fr) minmax(0,19cqw);
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:
+    "pot    banner aux"
+    "pyou   board  pfoe"
+    "resign tray   cta";
+  gap:1.2cqw; padding:1.6cqw 1.8cqw; align-items:start;
+}
+.stage > .pot{grid-area:pot; justify-self:start}
+.stage > .banner{grid-area:banner; justify-self:center}
+.stage > .aux{grid-area:aux; justify-self:end}
+/* Width lives on the low-specificity selector on purpose: a design below only needs
+   `[data-d=x] > .p { width: … }` to override it, with no !important anywhere. */
+.stage > .p{width:100%; align-self:center}
+.stage > .p.you{grid-area:pyou}
+.stage > .p.foe{grid-area:pfoe}
+.stage > .bd{grid-area:board; align-self:center}
+.stage > .resign{grid-area:resign; justify-self:start; align-self:end}
+.stage > .tray{grid-area:tray; justify-self:center; align-self:end}
+.stage > .cta{grid-area:cta; justify-self:end; align-self:end}
+</style>
+
+<style id="designs">
+/* ==========================================================================
+   THE TWENTY LAYOUTS
+   Each block below is the entire difference between one option and the next.
+   Everything they do not mention, they inherit from LAYOUT A above.
+   ========================================================================== */
+
+/* ── 01 · LUDO CLASSIC ─────────────────────────────────────────────────────
+   The family default, untouched. It is here as the control: every other option
+   should have to justify itself against this one. */
+[data-d="ludo"]{--bh:39cqw}
+
+/* ── 02 · RAIL ─────────────────────────────────────────────────────────────
+   Players become full-width bands. Removing the side columns is what buys the
+   board its extra width — this is the biggest playfield in the set. */
+[data-d="rail"]{
+  --bh:37cqw;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  grid-template-rows:auto auto 1fr auto;
+  grid-template-areas:
+    "pfoe   pfoe   pfoe"
+    "pot    banner aux"
+    "board  board  board"
+    "resign tray   cta";
+  gap:.8cqw 1.2cqw; padding:1.2cqw 1.6cqw;
+}
+[data-d="rail"] > .p{width:100%; flex-direction:row; align-items:center; gap:1.4cqw; padding:.7cqw 1.2cqw}
+[data-d="rail"] > .p.you{grid-area:resign; grid-column:1/-1; grid-row:5; margin-top:.6cqw}
+[data-d="rail"]{grid-template-rows:auto auto 1fr auto auto}
+[data-d="rail"] > .resign{grid-row:4; grid-column:1}
+[data-d="rail"] > .tray{grid-row:4; grid-column:2}
+[data-d="rail"] > .cta{grid-row:4; grid-column:3}
+[data-d="rail"] .p .top{flex:1 1 auto}
+[data-d="rail"] .p .stats{flex:0 0 auto; width:14cqw}
+[data-d="rail"] .p .lad{flex:0 0 12cqw; align-self:center}
+[data-d="rail"] .p .score{flex:none}
+[data-d="rail"] .p .cube{align-self:center}
+
+/* ── 03 · MILLED CARDS ─────────────────────────────────────────────────────
+   The handover's luxury language, kept but brought into the Chain palette:
+   chamfered corners instead of radii, a chrome edge, a leather face. The board
+   stays the only round object on the screen. */
+[data-d="cards"]{--bh:38cqw; background:radial-gradient(80% 60% at 50% 40%, #141416, #0a0a0b 75%)}
+[data-d="cards"] .p, [data-d="cards"] .pot{
+  border:0; border-radius:0; padding:1.5px;
+  background:linear-gradient(180deg,#71757a,#4d5054 30%,#232528 51%,#44474b 70%,#65696e);
+  clip-path:polygon(1cqw 0,100% 0,100% 100%,0 100%,0 1cqw);
+  box-shadow:0 1.4cqw 2.6cqw rgba(0,0,0,.7);
+}
+[data-d="cards"] .p.on{background:linear-gradient(180deg,#f2f4f6,#b9bec4 28%,#43464a 51%,#9aa0a6 70%,#dde1e6)}
+[data-d="cards"] .p > *, [data-d="cards"] .pot > *{position:relative; z-index:1}
+[data-d="cards"] .p::before, [data-d="cards"] .pot::before{
+  content:""; position:absolute; inset:1.5px; z-index:0;
+  clip-path:polygon(1cqw 0,100% 0,100% 100%,0 100%,0 1cqw);
+  background:repeating-linear-gradient(37deg, rgba(255,255,255,.03) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-51deg, rgba(0,0,0,.45) 0 1px, transparent 1px 5px), #0f0e12;
+}
+[data-d="cards"] .p{display:flex; gap:0}
+[data-d="cards"] .p .top, [data-d="cards"] .p .stats,
+[data-d="cards"] .p .lad, [data-d="cards"] .p .score{margin:.55cqw .8cqw}
+[data-d="cards"] .p .stat{border-radius:0; clip-path:polygon(.4cqw 0,100% 0,100% calc(100% - .4cqw),calc(100% - .4cqw) 100%,0 100%,0 .4cqw)}
+[data-d="cards"] .p .ava{border-radius:50%; box-shadow:0 0 0 1px #000, 0 0 0 .16cqw #5c6065}
+[data-d="cards"] .p.on .ava{box-shadow:0 0 0 1px #000, 0 0 0 .16cqw #cfd4d9}
+[data-d="cards"] .p .nm{font-style:italic; font-weight:800}
+[data-d="cards"] .p .stat .v, [data-d="cards"] .p .score b{text-shadow:0 -1px 1px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.09)}
+[data-d="cards"] .pot{padding:1.5px}
+[data-d="cards"] .pot > *{margin:0 1.1cqw}
+[data-d="cards"] .pot .k{margin-top:.7cqw}
+[data-d="cards"] .pot .s{margin-bottom:.8cqw}
+[data-d="cards"] .cta{clip-path:polygon(.5cqw 0,100% 0,100% calc(100% - .5cqw),calc(100% - .5cqw) 100%,0 100%,0 .5cqw); border-radius:0}
+
+/* ── 04 · COCKPIT ──────────────────────────────────────────────────────────
+   No side columns: both players, the tray and the action live in one binnacle
+   under the board. The eye never leaves the centre line. */
+[data-d="cockpit"]{--bh:33cqw; display:block; padding:1.3cqw 1.8cqw 14cqw}
+[data-d="cockpit"] .bd{position:absolute; left:50%; top:calc(50% - 6.2cqw); transform:translate(-50%,-50%)}
+/* the binnacle: one console carrying every reading and the single control */
+[data-d="cockpit"]::after{
+  content:""; position:absolute; left:1.8cqw; right:1.8cqw; bottom:1.3cqw; height:12cqw;
+  border-radius:1.4cqw 1.4cqw .8cqw .8cqw; background:var(--card);
+  border:1px solid var(--c-card-border); box-shadow:var(--card-shadow);
+}
+[data-d="cockpit"] > .p, [data-d="cockpit"] > .pot, [data-d="cockpit"] > .tray,
+[data-d="cockpit"] > .cta, [data-d="cockpit"] > .banner, [data-d="cockpit"] > .aux,
+[data-d="cockpit"] > .resign{position:absolute; z-index:2}
+[data-d="cockpit"] > .banner{left:50%; top:1.3cqw; transform:translateX(-50%)}
+[data-d="cockpit"] > .aux{right:1.8cqw; top:1.3cqw}
+[data-d="cockpit"] > .resign{left:1.8cqw; top:1.5cqw}
+[data-d="cockpit"] > .p{background:none; border:0; box-shadow:none; padding:0; width:23cqw; bottom:3cqw}
+[data-d="cockpit"] > .p.you{left:4cqw}
+[data-d="cockpit"] > .p.foe{right:4cqw}
+[data-d="cockpit"] > .pot{background:none; border:0; box-shadow:none; padding:0;
+  left:50%; transform:translateX(-50%); bottom:9.6cqw; align-items:center; text-align:center}
+[data-d="cockpit"] > .tray{left:50%; transform:translateX(-50%); bottom:6.7cqw}
+[data-d="cockpit"] > .cta{left:50%; transform:translateX(-50%); bottom:2.4cqw; min-width:20cqw}
+[data-d="cockpit"] .p .stat{background:rgba(0,0,0,.45)}
+[data-d="cockpit"] .p .lad{display:none}
+
+/* ── 05 · BEZEL ────────────────────────────────────────────────────────────
+   The HUD is the frame. Values are set INTO the surround, so there is not a
+   single floating panel and the screen reads as one physical object. */
+[data-d="bezel"]{
+  --bh:33cqw;
+  background:linear-gradient(180deg,#1a1a1c,#0d0d0e);
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  grid-template-rows:auto auto 1fr auto auto;
+  grid-template-areas:
+    "pot    banner aux"
+    "pyou   board  pfoe"
+    "pyou   board  pfoe"
+    "pyou   board  pfoe"
+    "resign tray   cta";
+  gap:.7cqw 1.4cqw; padding:2.2cqw 2.4cqw;
+}
+[data-d="bezel"]::before{
+  content:""; position:absolute; inset:1cqw; border-radius:1.4cqw; pointer-events:none;
+  background:linear-gradient(180deg,#2a2a2d,#131315);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px #000, 0 1.4cqw 3cqw rgba(0,0,0,.6);
+}
+[data-d="bezel"] > *{position:relative; z-index:1}
+[data-d="bezel"] .p, [data-d="bezel"] .pot, [data-d="bezel"] .banner{
+  background:none; border:0; box-shadow:none; padding:.2cqw .4cqw;
+}
+[data-d="bezel"] .p .stat{background:none; border:0; box-shadow:none; padding:.25cqw 0;
+  border-top:1px solid rgba(255,255,255,.09); border-radius:0}
+[data-d="bezel"] .p .stats{gap:1.2cqw}
+[data-d="bezel"] .p .nm{font-size:1.15cqw}
+[data-d="bezel"] .bd img.case{border-radius:.5cqw; box-shadow:0 0 0 .35cqw #0b0b0c, 0 1.6cqw 3cqw rgba(0,0,0,.7)}
+
+/* ── 06 · SIDE COLUMN ──────────────────────────────────────────────────────
+   Everything in one tall left rail. The asymmetry is the point: it leaves an
+   obvious, already-designed home for move history, chat or spectators later. */
+[data-d="column"]{
+  --bh:41cqw;
+  grid-template-columns:22cqw minmax(0,1fr);
+  grid-template-rows:auto auto auto 1fr auto;
+  grid-template-areas:
+    "pot    board"
+    "pfoe   board"
+    "pyou   board"
+    "tray   board"
+    "resign board";
+  gap:.8cqw 1.6cqw; padding:1.5cqw;
+}
+[data-d="column"] > .banner{grid-area:board; align-self:start; justify-self:center; z-index:3; margin-top:-.2cqw}
+[data-d="column"] > .aux{grid-area:board; align-self:end; justify-self:end; z-index:3}
+[data-d="column"] > .cta{grid-area:board; align-self:end; justify-self:center; z-index:3}
+[data-d="column"] > .p{width:100%}
+[data-d="column"] > .tray{justify-self:start; align-self:start; margin-top:.4cqw}
+[data-d="column"] > .resign{align-self:start; justify-self:start}
+[data-d="column"] > .pot{width:100%}
+[data-d="column"] .bd{justify-self:end}
+
+/* ── 07 · BROADCAST ────────────────────────────────────────────────────────
+   Built to be watched: a score bug that never moves, lower-third name bars
+   riding the board edge, and a ticker along the foot. */
+[data-d="broadcast"]{
+  /* NB: do not add `position:relative` — the stage is already absolutely filling the frame,
+     and relative would collapse its height to its (absolute-only) content. */
+  --bh:44cqw; display:block; padding:0;
+  background:radial-gradient(70% 55% at 50% 42%, #16161a, #08080a 78%);
+}
+[data-d="broadcast"] .bd{position:absolute; left:50%; top:47%; transform:translate(-50%,-50%)}
+[data-d="broadcast"] > .pot{position:absolute; left:0; top:0; border-radius:0 0 .9cqw 0;
+  border-left:0; border-top:0; padding:.9cqw 1.6cqw .9cqw 1.4cqw}
+[data-d="broadcast"] > .pot::after{content:""; position:absolute; left:0; top:0; bottom:0; width:.3cqw; background:var(--c-primary)}
+[data-d="broadcast"] > .banner{position:absolute; left:50%; top:1.2cqw; transform:translateX(-50%)}
+[data-d="broadcast"] > .aux{position:absolute; right:1.2cqw; top:1.2cqw}
+[data-d="broadcast"] > .p{
+  position:absolute; bottom:8.5cqw; width:30cqw; flex-direction:row; align-items:center; gap:1cqw;
+  padding:.6cqw .9cqw; border-radius:.5cqw; backdrop-filter:blur(6px);
+  background:linear-gradient(90deg, rgba(15,15,17,.94), rgba(15,15,17,.66));
+}
+[data-d="broadcast"] > .p.you{left:1.4cqw; border-left:.3cqw solid var(--c-primary)}
+[data-d="broadcast"] > .p.foe{right:1.4cqw; border-right:.3cqw solid rgba(255,255,255,.25);
+  background:linear-gradient(270deg, rgba(15,15,17,.94), rgba(15,15,17,.66)); flex-direction:row-reverse}
+[data-d="broadcast"] .p .lad, [data-d="broadcast"] .p .cube{display:none}
+[data-d="broadcast"] .p .stats{gap:.4cqw}
+[data-d="broadcast"] .p .stat{padding:.3cqw .5cqw}
+/* the ticker */
+[data-d="broadcast"]::after{
+  content:"MATCH TO 5  ·  VALERIA 3 — 1 0xKAI  ·  CUBE 2, HELD BY VALERIA  ·  WHITE ON ROLL  ·  POT 1 600";
+  position:absolute; left:0; right:0; bottom:0; height:2.6cqw; display:flex; align-items:center;
+  padding-left:1.4cqw; background:#0b0b0c; border-top:1px solid rgba(255,255,255,.09);
+  font:700 .72cqw var(--c-font); letter-spacing:.18em; color:rgba(255,255,255,.45); white-space:nowrap;
+}
+[data-d="broadcast"] > .tray{position:absolute; left:50%; bottom:4.2cqw; transform:translateX(-50%)}
+[data-d="broadcast"] > .cta{position:absolute; right:1.4cqw; bottom:3.6cqw}
+[data-d="broadcast"] > .resign{position:absolute; left:1.4cqw; bottom:3.8cqw}
+
+/* ── 08 · THE TABLE ────────────────────────────────────────────────────────
+   Your concept render as an interface. Warm wood and leather instead of a flat
+   dark field, names on brass plaques, the pot engraved on a plate at the rail. */
+[data-d="table"]{
+  --bh:36cqw;
+  background:
+    radial-gradient(60% 45% at 50% 38%, rgba(255,226,170,.09), transparent 70%),
+    repeating-linear-gradient(93deg, rgba(0,0,0,.16) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg,#3a2a1e,#241811 60%,#150e0a);
+}
+[data-d="table"] .p, [data-d="table"] .pot{
+  border:0; border-radius:.35cqw; box-shadow:0 .5cqw 1.2cqw rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.35);
+  background:linear-gradient(180deg,#d8b169,#a9812f 45%,#8c6825 55%,#c9a054);
+  color:#2a1f0c;
+}
+[data-d="table"] .p .nm, [data-d="table"] .p .stat .v, [data-d="table"] .p .score b, [data-d="table"] .p .clock{
+  color:#2a1f0c; text-shadow:0 1px 0 rgba(255,255,255,.35)}
+[data-d="table"] .p .sub, [data-d="table"] .p .stat .k, [data-d="table"] .p .score span,
+[data-d="table"] .pot .k, [data-d="table"] .pot .s{color:rgba(42,31,12,.62)}
+[data-d="table"] .pot .v{color:#2a1f0c; text-shadow:0 1px 0 rgba(255,255,255,.4)}
+[data-d="table"] .p .stat{background:rgba(90,66,20,.28); border:0; box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+[data-d="table"] .p .ava{background:radial-gradient(120% 120% at 34% 24%,#6b5220,#3a2a10);
+  color:#e6cf9a; box-shadow:inset 0 1px 2px rgba(0,0,0,.5)}
+[data-d="table"] .p .lad i{background:rgba(42,31,12,.3)}
+[data-d="table"] .p .lad i.on{background:#4a3512}
+[data-d="table"] .banner{background:rgba(20,13,8,.85); border:1px solid rgba(255,255,255,.1); color:#f0e2c4}
+[data-d="table"] .bd img.case{box-shadow:0 2.2cqw 4cqw rgba(0,0,0,.75)}
+[data-d="table"] .btn{background:rgba(20,13,8,.7); color:#e6d5ae}
+
+/* ── 09 · TERMINAL ─────────────────────────────────────────────────────────
+   For players who count. Monospace throughout, laid out as a data window —
+   and it is the only option that shows the pip DIFFERENCE, which is the number
+   a strong player actually reads. */
+[data-d="terminal"]{
+  --bh:38cqw; background:#08090a;
+  grid-template-columns:20cqw minmax(0,1fr) 20cqw;
+}
+[data-d="terminal"] *{font-family:var(--mono) !important; font-style:normal !important}
+[data-d="terminal"] .p, [data-d="terminal"] .pot, [data-d="terminal"] .banner{
+  background:#0d0f11; border:1px solid #1c2024; border-radius:.25cqw; box-shadow:none}
+[data-d="terminal"] .p .nm{font-weight:500; letter-spacing:-.02em}
+[data-d="terminal"] .p .sub, [data-d="terminal"] .p .stat .k, [data-d="terminal"] .pot .k{
+  font-weight:400; letter-spacing:.16em; color:#5b6570}
+[data-d="terminal"] .p .stat{background:#08090a; border:1px solid #171b1f; border-radius:.2cqw; box-shadow:none}
+[data-d="terminal"] .p .ava{border-radius:.2cqw; background:#14181c; font-weight:500}
+[data-d="terminal"] .p .lad{height:.35cqw}
+[data-d="terminal"] .p .lad i{border-radius:0}
+[data-d="terminal"] .banner::before{border-radius:0; width:.25cqw}
+[data-d="terminal"] .cta{border-radius:.25cqw; font-weight:700; letter-spacing:.1em}
+[data-d="terminal"] .btn{border-radius:.2cqw; background:#14181c; letter-spacing:.1em}
+/* the differential readout this design exists for */
+[data-d="terminal"] > .banner::after{
+  content:"PIP −13  ·  RACE 61%  ·  CUBE 2 (YOU)"; margin-left:1cqw; padding-left:1cqw;
+  border-left:1px solid #232a30; color:#7d8992; font-size:.78cqw; letter-spacing:.1em;
+}
+
+/* ── 10 · CHESS CLOCK ──────────────────────────────────────────────────────
+   The clock becomes the biggest type on screen and everything else demotes to
+   a caption. The right call only if the money version is played at speed. */
+[data-d="clock"]{
+  --bh:34cqw;
+  grid-template-rows:auto auto 1fr auto;
+  grid-template-areas:
+    "pyou   pot    pfoe"
+    "banner banner banner"
+    "board  board  board"
+    "resign tray   cta";
+  gap:.8cqw 1.4cqw; padding:1.4cqw 1.8cqw;
+}
+[data-d="clock"] > .p{width:100%; align-items:center; text-align:center; padding:.7cqw .9cqw}
+[data-d="clock"] .p .top{flex-direction:column; gap:.2cqw}
+[data-d="clock"] .p .clock{font-size:3.6cqw; letter-spacing:-.04em; line-height:1;
+  text-shadow:0 0 2.4cqw rgba(255,255,255,.12)}
+[data-d="clock"] .p.on .clock{color:var(--c-primary); text-shadow:0 0 2.4cqw rgba(255,225,104,.35)}
+[data-d="clock"] .p .ava{display:none}
+[data-d="clock"] .p .who{flex:none}
+[data-d="clock"] .p .nm{font-size:.9cqw; letter-spacing:.1em; text-transform:uppercase; color:var(--c-dim)}
+[data-d="clock"] .p .sub{display:none}
+[data-d="clock"] .p .stats{gap:.4cqw}
+[data-d="clock"] .p .stat{padding:.3cqw .4cqw; text-align:center}
+[data-d="clock"] .p .stat .v{font-size:.85cqw}
+[data-d="clock"] .p .lad{display:none}
+[data-d="clock"] .p .score{justify-content:center}
+[data-d="clock"] .p .score b{font-size:.95cqw}
+[data-d="clock"] > .pot{align-items:center; text-align:center; align-self:center}
+[data-d="clock"] > .aux{grid-area:banner; justify-self:end; align-self:center}
+[data-d="clock"] > .banner{justify-self:center}
+
+/* ── 11 · GLASS ────────────────────────────────────────────────────────────
+   Panels float over the board instead of beside it, so the playfield can run
+   right to the edges and the leather stays visible through the chrome. */
+[data-d="glass"]{
+  --bh:47cqw; display:block; padding:0;
+  background:radial-gradient(70% 60% at 50% 45%, #15171b, #08090b 80%);
+}
+[data-d="glass"] .bd{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)}
+[data-d="glass"] > .p, [data-d="glass"] > .pot, [data-d="glass"] > .banner, [data-d="glass"] > .tray{
+  position:absolute; z-index:5;
+  background:rgba(255,255,255,.055); backdrop-filter:blur(14px) saturate(1.2);
+  border:1px solid rgba(255,255,255,.14); border-radius:1cqw;
+  box-shadow:0 1cqw 2.4cqw rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.22);
+}
+[data-d="glass"] > .p{width:19cqw; top:50%; transform:translateY(-50%)}
+[data-d="glass"] > .p.you{left:1.6cqw}
+[data-d="glass"] > .p.foe{right:1.6cqw}
+[data-d="glass"] > .pot{left:1.6cqw; top:1.6cqw}
+[data-d="glass"] > .banner{left:50%; top:1.6cqw; transform:translateX(-50%)}
+[data-d="glass"] > .tray{left:50%; bottom:1.6cqw; transform:translateX(-50%); padding:.6cqw 1cqw}
+[data-d="glass"] > .aux{position:absolute; right:1.6cqw; top:1.6cqw; z-index:5}
+[data-d="glass"] > .cta{position:absolute; right:1.6cqw; bottom:1.6cqw; z-index:5}
+[data-d="glass"] > .resign{position:absolute; left:1.6cqw; bottom:1.6cqw; z-index:5}
+[data-d="glass"] .p .stat{background:rgba(0,0,0,.28); border-color:rgba(255,255,255,.08); box-shadow:none}
+
+/* ── 12 · BETTING SLIP ─────────────────────────────────────────────────────
+   Paper stock, perforations, monospace print, and the pot set as a totalled
+   sum line. The one option that leans all the way into the wager. */
+[data-d="slip"]{
+  --bh:37cqw; background:linear-gradient(180deg,#101010,#080808);
+}
+[data-d="slip"] .p, [data-d="slip"] .pot{
+  background:linear-gradient(180deg,#f4f1e8,#e6e1d2); color:#141210; border:0; border-radius:0;
+  box-shadow:0 1cqw 2cqw rgba(0,0,0,.55);
+  /* the torn edge */
+  -webkit-mask:radial-gradient(.34cqw at .34cqw 50%, transparent 98%, #000) left/100% .78cqw repeat-y,
+    radial-gradient(.34cqw at calc(100% - .34cqw) 50%, transparent 98%, #000) right/100% .78cqw repeat-y,
+    linear-gradient(#000,#000) center/calc(100% - .68cqw) 100% no-repeat;
+  padding:.9cqw 1.4cqw;
+}
+[data-d="slip"] .p *, [data-d="slip"] .pot *{font-family:var(--mono) !important; font-style:normal !important}
+[data-d="slip"] .p .nm{font-weight:700; font-size:1cqw; letter-spacing:-.03em; color:#141210}
+[data-d="slip"] .p .sub, [data-d="slip"] .p .stat .k, [data-d="slip"] .p .score span,
+[data-d="slip"] .pot .k, [data-d="slip"] .pot .s{color:#6b665c}
+[data-d="slip"] .p .clock, [data-d="slip"] .p .stat .v, [data-d="slip"] .p .score b{color:#141210}
+[data-d="slip"] .p .stat{background:none; border:0; border-top:1px dashed #b9b2a0; border-radius:0; box-shadow:none; padding:.3cqw 0}
+[data-d="slip"] .p .ava{background:#141210; color:#f4f1e8; border-radius:0}
+[data-d="slip"] .p .lad i{background:#c8c2b1}
+[data-d="slip"] .p .lad i.on{background:#141210}
+[data-d="slip"] .p .disc.w{background:#fff; box-shadow:inset 0 0 0 .07cqw #141210}
+[data-d="slip"] .p .disc.b{background:#141210}
+[data-d="slip"] .pot .v{color:#141210; font-size:1.5cqw; border-top:1px solid #141210;
+  border-bottom:3px double #141210; padding:.2cqw 0; margin-top:.2cqw}
+[data-d="slip"] .pot .k{letter-spacing:.3em}
+[data-d="slip"] .coin{background:#141210}
+[data-d="slip"] .banner{background:#f4f1e8; color:#141210; border:0; border-radius:0; font-family:var(--mono)}
+[data-d="slip"] .banner b{color:#141210}
+[data-d="slip"] .cta{border-radius:0; font-family:var(--mono); font-style:normal; letter-spacing:.08em}
+
+/* ── 13 · BLUEPRINT ────────────────────────────────────────────────────────
+   Outlines only — not one gradient in the whole HUD. Values are called out
+   with dimension leaders the way a drawing would annotate a part. */
+[data-d="blueprint"]{
+  --bh:38cqw;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.028) 0 1px, transparent 1px 3.2cqw),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.028) 0 1px, transparent 1px 3.2cqw),
+    #0a0c0e;
+}
+[data-d="blueprint"] .p, [data-d="blueprint"] .pot, [data-d="blueprint"] .banner{
+  background:none; border:1px solid rgba(190,220,255,.32); border-radius:0; box-shadow:none;
+}
+[data-d="blueprint"] .p .stat{background:none; border:0; border-top:1px solid rgba(190,220,255,.2);
+  border-radius:0; box-shadow:none; padding:.3cqw 0}
+[data-d="blueprint"] .p .ava{background:none; border:1px solid rgba(190,220,255,.32); border-radius:0; color:#cfe3f7}
+[data-d="blueprint"] .p .nm, [data-d="blueprint"] .p .stat .v, [data-d="blueprint"] .p .score b,
+[data-d="blueprint"] .p .clock{color:#dbe9f7; font-weight:500}
+[data-d="blueprint"] .p .sub, [data-d="blueprint"] .p .stat .k, [data-d="blueprint"] .pot .k{
+  color:#7d95ab; letter-spacing:.2em}
+[data-d="blueprint"] .p .lad i{background:none; box-shadow:inset 0 0 0 1px rgba(190,220,255,.3)}
+[data-d="blueprint"] .p .lad i.on{background:rgba(190,220,255,.55); box-shadow:none}
+[data-d="blueprint"] .p .disc{box-shadow:inset 0 0 0 1px rgba(190,220,255,.5)}
+[data-d="blueprint"] .pot .v{color:var(--c-primary)}
+/* leader lines from each panel to the board */
+[data-d="blueprint"] > .p.you::after, [data-d="blueprint"] > .p.foe::after{
+  content:""; position:absolute; top:50%; width:1.4cqw; height:1px; background:rgba(190,220,255,.35);
+}
+[data-d="blueprint"] > .p.you{position:relative}
+[data-d="blueprint"] > .p.foe{position:relative}
+[data-d="blueprint"] > .p.you::after{right:-1.4cqw}
+[data-d="blueprint"] > .p.foe::after{left:-1.4cqw}
+[data-d="blueprint"] .banner::before{background:#cfe3f7; box-shadow:none; border-radius:0}
+[data-d="blueprint"] .btn{background:none; border:1px solid rgba(190,220,255,.28); color:#bdd2e4; border-radius:0}
+[data-d="blueprint"] .cta{border-radius:0}
+
+/* ── 14 · THUMB ZONE ───────────────────────────────────────────────────────
+   Phone in landscape. Everything you TOUCH is one column under the right
+   thumb; everything you only READ is top-left, out of reach on purpose. */
+[data-d="thumb"]{
+  --bh:41cqw;
+  grid-template-columns:minmax(0,1fr) 17cqw;
+  grid-template-rows:auto auto 1fr auto;
+  grid-template-areas:
+    "pfoe  aux"
+    "pot   ctrl"
+    "board ctrl"
+    "pyou  ctrl";
+  gap:.7cqw 1.2cqw; padding:1.2cqw 1.4cqw;
+}
+[data-d="thumb"] > .banner{grid-area:board; align-self:start; justify-self:center; z-index:3}
+[data-d="thumb"] > .p{width:100%; flex-direction:row; align-items:center; gap:1cqw; padding:.55cqw .9cqw}
+[data-d="thumb"] .p .lad, [data-d="thumb"] .p .cube{display:none}
+[data-d="thumb"] .p .stats{width:11cqw; flex:none}
+[data-d="thumb"] > .pot{flex-direction:row; align-items:baseline; gap:.8cqw; padding:.5cqw 1cqw}
+[data-d="thumb"] > .tray{grid-area:ctrl; align-self:start; justify-self:center; flex-direction:column; margin-top:1cqw}
+[data-d="thumb"] > .cta{grid-area:ctrl; align-self:end; justify-self:stretch; margin-bottom:3.4cqw;
+  padding:1.5cqw 1cqw; font-size:1.15cqw}
+[data-d="thumb"] > .resign{grid-area:ctrl; align-self:end; justify-self:stretch}
+[data-d="thumb"] .bd{justify-self:center}
+/* the reachable arc, drawn so the intent is legible */
+[data-d="thumb"]::after{
+  content:""; position:absolute; right:-6cqw; bottom:-10cqw; width:34cqw; height:34cqw;
+  border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle, rgba(255,225,104,.07), transparent 68%);
+}
+
+/* ── 15 · PORTRAIT ─────────────────────────────────────────────────────────
+   Phone upright: opponent on top, you at the bottom, action bar pinned above
+   the home indicator. Note this one NEEDS a portrait board render — rotating
+   the landscape picture 90° was rejected. */
+[data-d="portrait"]{
+  --bh:26cqw;
+  grid-template-columns:1fr;
+  grid-template-rows:auto auto 1fr auto auto;
+  grid-template-areas:"pfoe" "pot" "board" "pyou" "bar";
+  gap:.7cqw; padding:1.2cqw 22cqw;
+  background:linear-gradient(180deg,#141414,#0a0a0a);
+}
+[data-d="portrait"] > .p{width:100%; flex-direction:row; align-items:center; gap:.9cqw; padding:.6cqw .9cqw}
+[data-d="portrait"] .p .lad{display:none}
+[data-d="portrait"] .p .stats{width:12cqw; flex:none}
+[data-d="portrait"] > .pot{flex-direction:row; align-items:baseline; gap:.7cqw; padding:.45cqw .9cqw; justify-content:center}
+[data-d="portrait"] > .pot .s{display:none}
+[data-d="portrait"] > .banner{grid-area:board; align-self:start; justify-self:center; z-index:3}
+[data-d="portrait"] > .tray{grid-area:bar; justify-self:start; align-self:center}
+[data-d="portrait"] > .cta{grid-area:bar; justify-self:end; align-self:center}
+[data-d="portrait"] > .resign, [data-d="portrait"] > .aux{display:none}
+[data-d="portrait"] .bd{justify-self:center}
+/* the phone body, so the proportion is honest */
+[data-d="portrait"]::before{
+  content:""; position:absolute; left:20.4cqw; right:20.4cqw; top:.4cqw; bottom:.4cqw;
+  border-radius:2.4cqw; pointer-events:none; border:.5cqw solid #1c1c1e;
+  box-shadow:0 0 0 1px #000, 0 2cqw 4cqw rgba(0,0,0,.6);
+}
+
+/* ── 16 · MINIMAL ──────────────────────────────────────────────────────────
+   No surfaces at all. Hairlines and type on black; the board is the only
+   object with weight, which makes it read far larger than it measures. */
+[data-d="minimal"]{--bh:42cqw; background:#0a0a0a; padding:2cqw 2.4cqw; gap:1.4cqw}
+[data-d="minimal"] .p, [data-d="minimal"] .pot, [data-d="minimal"] .banner{
+  background:none; border:0; box-shadow:none; padding:0}
+[data-d="minimal"] .p{gap:.9cqw}
+[data-d="minimal"] .p .stat{background:none; border:0; box-shadow:none; border-radius:0; padding:0}
+[data-d="minimal"] .p .stats{gap:1.6cqw}
+[data-d="minimal"] .p .ava{display:none}
+[data-d="minimal"] .p .nm{font-size:1.25cqw; font-weight:600; letter-spacing:-.02em}
+[data-d="minimal"] .p .stat .v{font-size:1.5cqw; font-weight:500}
+[data-d="minimal"] .p .lad{height:1px; gap:0; background:rgba(255,255,255,.12)}
+[data-d="minimal"] .p .lad i{background:none; border-radius:0}
+[data-d="minimal"] .p .lad i.on{background:#fff; height:1px; margin-top:0}
+[data-d="minimal"] .p.off{opacity:.32}
+[data-d="minimal"] .banner{font-weight:500}
+[data-d="minimal"] .banner::before{width:.2cqw; height:.9cqw; box-shadow:none}
+[data-d="minimal"] .btn{background:none; color:rgba(255,255,255,.42); padding:.5cqw .4cqw}
+[data-d="minimal"] .tok{border-radius:.25cqw; box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); background:none}
+[data-d="minimal"] .cta{background:none; color:var(--c-primary); box-shadow:inset 0 0 0 1px var(--c-primary)}
+
+/* ── 17 · POKER ROOM ───────────────────────────────────────────────────────
+   Felt and a padded rail. The pot is not a label but a stack that grows — you
+   can see what is on the table without reading a number. */
+[data-d="poker"]{
+  --bh:36cqw;
+  background:
+    radial-gradient(65% 50% at 50% 42%, rgba(255,255,255,.05), transparent 72%),
+    repeating-linear-gradient(45deg, rgba(0,0,0,.10) 0 2px, transparent 2px 4px),
+    linear-gradient(180deg,#123324,#0b2118 65%,#07150f);
+}
+[data-d="poker"]::before{
+  content:""; position:absolute; inset:0; pointer-events:none; border-radius:16px;
+  box-shadow:inset 0 0 0 1.6cqw #2b1a12, inset 0 0 0 1.75cqw #000,
+    inset 0 0 3cqw rgba(0,0,0,.55);
+}
+[data-d="poker"] > *{position:relative; z-index:1}
+[data-d="poker"]{padding:2.6cqw 2.8cqw}
+[data-d="poker"] .p, [data-d="poker"] .pot, [data-d="poker"] .banner{
+  background:linear-gradient(180deg, rgba(8,20,15,.92), rgba(4,12,9,.92));
+  border:1px solid rgba(255,255,255,.1); box-shadow:0 .7cqw 1.6cqw rgba(0,0,0,.5)}
+[data-d="poker"] .p .stat{background:rgba(0,0,0,.4); border-color:rgba(255,255,255,.06)}
+/* the pot, as an actual stack of chips */
+[data-d="poker"] > .pot{padding-left:4.4cqw; min-height:4cqw; justify-content:center}
+[data-d="poker"] > .pot::before{
+  content:""; position:absolute; left:1cqw; top:50%; width:2.6cqw; height:2.9cqw; transform:translateY(-50%);
+  background:
+    linear-gradient(180deg,#ffe168 0 .34cqw, #b99a34 .34cqw .5cqw) 0 0/100% .5cqw repeat,
+    #b99a34;
+  border-radius:.3cqw; box-shadow:0 .2cqw .4cqw rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.35);
+}
+
+/* ── 18 · BIG TYPE ─────────────────────────────────────────────────────────
+   Accessibility first: ~1.4× type, contrast past AAA, every state written out
+   in words rather than signalled by colour, and much larger hit targets. */
+[data-d="bigtype"]{--bh:35cqw; background:#000; gap:1.2cqw}
+[data-d="bigtype"] .p{padding:1.1cqw 1.3cqw; border:2px solid #fff; background:#0c0c0c; border-radius:.7cqw}
+[data-d="bigtype"] .p.off{opacity:1; border-color:rgba(255,255,255,.35)}
+[data-d="bigtype"] .p .nm{font-size:1.5cqw; font-weight:800}
+[data-d="bigtype"] .p .sub{font-size:.92cqw; color:#fff; letter-spacing:.06em}
+[data-d="bigtype"] .p .clock{font-size:1.35cqw; color:#fff}
+[data-d="bigtype"] .p .stat{background:#000; border:2px solid rgba(255,255,255,.55)}
+[data-d="bigtype"] .p .stat .k{font-size:.85cqw; color:#fff}
+[data-d="bigtype"] .p .stat .v{font-size:1.6cqw}
+[data-d="bigtype"] .p .score b{font-size:1.7cqw}
+[data-d="bigtype"] .p .score span{font-size:1cqw; color:#fff}
+[data-d="bigtype"] .p .lad{height:.7cqw}
+[data-d="bigtype"] .p .ava{width:2.6cqw; height:2.6cqw; font-size:1.25cqw; color:#fff}
+[data-d="bigtype"] .pot{border:2px solid #fff; background:#0c0c0c}
+[data-d="bigtype"] .pot .k, [data-d="bigtype"] .pot .s{color:#fff; font-size:.9cqw}
+[data-d="bigtype"] .pot .v{font-size:2.1cqw}
+[data-d="bigtype"] .banner{border:2px solid #fff; background:#0c0c0c; font-size:1.25cqw}
+[data-d="bigtype"] .cta{font-size:1.45cqw; padding:1.2cqw 2.4cqw; border:2px solid #fff}
+[data-d="bigtype"] .btn{font-size:1.05cqw; padding:.85cqw 1.4cqw; background:#1c1c1c; color:#fff; border:2px solid rgba(255,255,255,.6)}
+[data-d="bigtype"] .tok{width:2.3cqw; height:2.3cqw}
+
+/* ── 19 · ARCADE ───────────────────────────────────────────────────────────
+   The loud one, included as the upper bound. If this is too much it tells you
+   where the line is — which is worth one slot out of twenty. */
+[data-d="arcade"]{
+  --bh:36cqw;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.30) 0 1px, transparent 1px 3px),
+    radial-gradient(70% 55% at 50% 40%, #1a1430, #0a0714 78%);
+}
+[data-d="arcade"] .p, [data-d="arcade"] .pot, [data-d="arcade"] .banner{
+  background:rgba(10,7,20,.85); border:1px solid rgba(255,225,104,.35); border-radius:.4cqw;
+  box-shadow:0 0 1.4cqw rgba(255,225,104,.16), inset 0 0 1.2cqw rgba(255,225,104,.07);
+}
+[data-d="arcade"] .p.on{border-color:var(--c-primary); box-shadow:0 0 2.4cqw rgba(255,225,104,.4)}
+[data-d="arcade"] .p .nm{text-transform:uppercase; letter-spacing:.06em; font-weight:900;
+  text-shadow:0 0 .9cqw rgba(255,225,104,.55)}
+[data-d="arcade"] .p .stat{background:rgba(0,0,0,.55); border-color:rgba(255,225,104,.2)}
+[data-d="arcade"] .p .stat .v, [data-d="arcade"] .p .score b, [data-d="arcade"] .pot .v{
+  color:var(--c-primary); text-shadow:0 0 1cqw rgba(255,225,104,.7); letter-spacing:.06em}
+[data-d="arcade"] .p .clock{color:#ff6f8f; text-shadow:0 0 .9cqw rgba(255,111,143,.6)}
+[data-d="arcade"] .p .lad i.on{box-shadow:0 0 .5cqw var(--c-primary)}
+[data-d="arcade"] .pot .v{font-size:2cqw}
+[data-d="arcade"] .banner{text-transform:uppercase; letter-spacing:.1em; font-weight:800}
+[data-d="arcade"] .banner::before{box-shadow:0 0 1.4cqw var(--c-primary)}
+[data-d="arcade"] .cta{box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 0 2.4cqw rgba(255,225,104,.75)}
+[data-d="arcade"] .bd img.case{box-shadow:0 0 3cqw rgba(120,90,255,.22), 0 1.6cqw 3cqw rgba(0,0,0,.7)}
+
+/* ── 20 · MUSEUM ───────────────────────────────────────────────────────────
+   The board as exhibit, the HUD as a wall label: serif, generous margins,
+   everything set quietly beneath the object. The most premium of the twenty. */
+[data-d="museum"]{
+  --bh:34cqw; background:linear-gradient(180deg,#171614,#0d0c0b);
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  grid-template-rows:auto 1fr auto auto;
+  grid-template-areas:
+    "banner banner banner"
+    "board  board  board"
+    "pyou   pot    pfoe"
+    "resign tray   cta";
+  gap:1.4cqw 2.4cqw; padding:2.2cqw 3.2cqw 1.8cqw;
+}
+[data-d="museum"] .p, [data-d="museum"] .pot, [data-d="museum"] .banner{
+  background:none; border:0; box-shadow:none; padding:0}
+[data-d="museum"] .p{width:100%; gap:.5cqw; border-top:1px solid rgba(255,255,255,.16); padding-top:.7cqw}
+[data-d="museum"] .p .ava{display:none}
+[data-d="museum"] .p .nm{font-family:"Instrument Serif", Georgia, serif; font-size:1.7cqw;
+  font-weight:400; letter-spacing:0; color:#efe9df}
+[data-d="museum"] .p .sub{font-size:.66cqw; letter-spacing:.24em; color:rgba(239,233,223,.42)}
+[data-d="museum"] .p .stat{background:none; border:0; box-shadow:none; border-radius:0; padding:0}
+[data-d="museum"] .p .stats{gap:2cqw}
+[data-d="museum"] .p .stat .k{font-size:.6cqw; letter-spacing:.22em; color:rgba(239,233,223,.4)}
+[data-d="museum"] .p .stat .v{font-family:"Instrument Serif", Georgia, serif; font-size:1.5cqw; font-weight:400; color:#efe9df}
+[data-d="museum"] .p .lad{display:none}
+[data-d="museum"] .p .score b{font-family:"Instrument Serif", Georgia, serif; font-weight:400; color:#efe9df}
+[data-d="museum"] .p .clock{font-size:.85cqw; color:rgba(239,233,223,.55)}
+[data-d="museum"] > .pot{align-items:center; text-align:center; border-top:1px solid rgba(255,255,255,.16); padding-top:.7cqw}
+[data-d="museum"] .pot .k{font-size:.6cqw; letter-spacing:.28em; color:rgba(239,233,223,.4)}
+[data-d="museum"] .pot .v{font-family:"Instrument Serif", Georgia, serif; font-size:2cqw; font-weight:400; color:var(--c-primary)}
+[data-d="museum"] > .banner{justify-self:center; font-family:"Instrument Serif", Georgia, serif;
+  font-size:1.35cqw; font-weight:400; color:#efe9df}
+[data-d="museum"] .banner::before{height:.9cqw; box-shadow:none}
+[data-d="museum"] .banner b{font-weight:400; font-style:italic}
+[data-d="museum"] > .aux{grid-area:banner; justify-self:end}
+[data-d="museum"] .btn{background:none; color:rgba(239,233,223,.5); font-style:normal; font-weight:600; letter-spacing:.14em}
+[data-d="museum"] .cta{font-style:normal; font-weight:600; letter-spacing:.1em; border-radius:.3cqw}
+[data-d="museum"] .bd img.case{box-shadow:0 2.6cqw 5cqw rgba(0,0,0,.75)}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <h1>Chain Backgammon<br><em>20 HUD &amp; playfield options</em></h1>
+    <p>
+      Twenty complete directions for the table screen, all showing the <b>same live position</b> so they
+      can be compared honestly. Each one is the identical markup wearing a different layout and
+      material — pick a number and it gets built as-is. The base language is the <b>Chain / Ludo
+      family</b>: one brand-yellow action per screen, dark gradient cards, Poppins, tabular numbers.
+      The board itself is your photographed case; every option can run on any of the seven sets.
+    </p>
+    <div class="legend">
+      <span>Position shown: <i>white to play 5-3, one on the bar, bearing off started</i></span>
+      <span>Green <i>= landing spots only</i></span>
+      <span>Yellow <i>= one primary action</i></span>
+      <span>Board set is switchable per option</span>
+    </div>
+  </header>
+
+  <nav class="jump" id="jump"></nav>
+  <main id="opts"></main>
+</div>
+
+<script src="/assets/board/pointmarks.js"></script>
+<script>
+/* ==========================================================================
+   THE SEVEN SETS
+   Column grid + bear-off wells measured per set: six share the master case,
+   cognac does not (its playing surface is noticeably wider), so nothing here
+   is derived from a formula.
+   ========================================================================== */
+const MASTER = {LX0:0.12309, RX0:0.53020, PT:0.05760, CHIP:0.05670, TY:0.06376, BY:0.95067};
+const RAIL   = {x:0.9240, w:0.0460, top:[0.068,0.311], bot:[0.690,0.930]};
+const SETS = {
+  rosso:    {name:"Rosso Corsa",         w:1788, h:1322, LX0:0.13180, RX0:0.53421, PT:0.05525},
+  carbon:   {name:"Carbon",              w:1156, h:851,  LX0:0.12957, RX0:0.53492, PT:0.05544},
+  cognac:   {name:"Cognac Zebra",        w:1149, h:851,  LX0:0.09488, RX0:0.52609, PT:0.06285,
+             well:{x:0.9525, w:0.0550, top:[0.045,0.334], bot:[0.666,0.956]}},
+  alcantara:{name:"Alcantara Anthracite",w:1155, h:853,  LX0:0.13109, RX0:0.53491, PT:0.05538},
+  green:    {name:"Racing Green",        w:1154, h:854,  LX0:0.13018, RX0:0.53466, PT:0.05541},
+  navy:     {name:"Navy Riviera",        w:1151, h:847,  LX0:0.12906, RX0:0.53494, PT:0.05568},
+  titan:    {name:"Titan Brushed",       w:1156, h:853,  LX0:0.13162, RX0:0.53480, PT:0.05543},
+};
+for (const k in SETS){ const s=SETS[k]; SETS[k]={...MASTER, ...s, id:k, ar:s.w/s.h, well:s.well||RAIL}; }
+
+/* The one position all twenty show. Mid-game, deliberately busy: two towers, a
+   blot, a checker on the bar, both wells started, and a live 5-3 to play. */
+const POS = {
+  w:{5:2, 6:3, 8:2, 11:2, 13:3, 18:1},      // 13 on the board + 2 borne off
+  b:{1:2, 3:1, 12:3, 17:3, 19:4},           // 13 + 1 on the bar + 1 borne off
+  bar:{w:0, b:1}, off:{w:2, b:1},
+  sel:13, marks:[8,10], dice:[5,3], used:[false,true], cube:2, cubeOwner:"you",
+};
+
+const PIPS={1:[[50,50]],2:[[28,28],[72,72]],3:[[26,26],[50,50],[74,74]],
+  4:[[28,28],[72,28],[28,72],[72,72]],5:[[26,26],[74,26],[50,50],[26,74],[74,74]],
+  6:[[30,24],[70,24],[30,50],[70,50],[30,76],[70,76]]};
+const ADJ={1:[2,3],2:[6,3],3:[1,5],4:[2,6],5:[4,1],6:[4,5]};
+
+/* `pointmarks.js` declares its table with `const`, which does NOT become a property of window —
+   so read the global binding directly rather than off window. */
+const MARKS = (typeof POINTMARKS !== "undefined") ? POINTMARKS : {};
+
+/* The six faces of a solid. `top` carries the rolled number; `fr` and `sd` are the two faces
+   physically adjacent to it on a real die, so the thing survives being looked at closely. */
+const dieFaces=(n)=>{
+  const [fr,sd]=ADJ[n]||ADJ[1];
+  const face=(c,v)=>`<span class="f ${c}">`+(v?PIPS[v].map(([x,y])=>`<i style="left:${x}%;top:${y}%"></i>`).join(""):"")+`</span>`;
+  return `<span class="cube">${face("top",n)}${face("fr",fr)}${face("sd",sd)}
+    <span class="f bk"></span><span class="f rt"></span><span class="f bt"></span></span>`;
+};
+
+/* Draw the board for one set. Everything is a percentage of the picture, so the
+   layer scales with it and never needs a pixel measurement. */
+function boardHTML(setId){
+  const S = SETS[setId], PM = MARKS[setId] || {};
+  const cw = S.CHIP*100;                 // chip width, % of board width
+  const cwh = S.CHIP*S.ar*100;           // the same length, % of board HEIGHT
+  const dieW = S.CHIP*0.84*0.84*100;
+  let h = "";
+
+  // landing spots, under the checkers so a crowded point never buries one
+  for(const p of POS.marks){
+    const m = PM[p]; if(!m) continue;
+    const poly = m.poly.split(",").map(q=>q.trim().split(/\s+/).map(v=>v+"%").join(" ")).join(",");
+    h += `<span class="mark" style="left:${m.x*100}%;top:${m.y*100}%;width:${m.w*100}%;height:${m.h*100}%;
+      clip-path:polygon(${poly});${p<=12?"transform:scaleY(-1);":""}"></span>`;
+  }
+
+  // checkers on the points
+  const put=(p,count,ink)=>{
+    const m = PM[p]; if(!m) return;
+    const top = p>=13;
+    const axis = (m.x + m.w/2)*100;
+    const base = (top ? m.y : m.y + m.h)*100;
+    const step = count>1 ? Math.min(cwh*0.92, (35.5-cwh)/(count-1)) : cwh*0.92;
+    for(let i=0;i<count;i++){
+      const y = top ? base + cwh*0.55 + i*step : base - cwh*0.55 - i*step;
+      const isTop = i===count-1;
+      const sel = (p===POS.sel && isTop);
+      h += `<span class="chip${sel?" sel":""}" style="left:${axis}%;top:${y}%;width:${cw}%;z-index:${10+i}">
+        <img src="/assets/board/chip-${ink}${sel?"-sel":""}.png" alt=""></span>`;
+    }
+  };
+  for(const p in POS.w) put(+p, POS.w[p], "w");
+  for(const p in POS.b) put(+p, POS.b[p], "b");
+
+  // the bar — hit checkers wait on their owner's side of the centre line
+  const barX = ((S.LX0 + 6*S.PT + S.RX0)/2)*100;
+  const mid  = ((S.TY + S.BY)/2)*100;
+  for(let i=0;i<POS.bar.b;i++)
+    h += `<span class="chip" style="left:${barX}%;top:${mid - cwh*0.62 - i*cwh*0.86}%;width:${cw}%;z-index:40">
+      <img src="/assets/board/chip-b.png" alt=""></span>`;
+  for(let i=0;i<POS.bar.w;i++)
+    h += `<span class="chip" style="left:${barX}%;top:${mid + cwh*0.62 + i*cwh*0.86}%;width:${cw}%;z-index:40">
+      <img src="/assets/board/chip-w.png" alt=""></span>`;
+
+  // bear-off wells: both seats collect on the RIGHT — you bottom, opponent top.
+  // Shown edge-on, a stack of silver rims with only the top checker's face.
+  const pile=(bottom, count, ink)=>{
+    const W=S.well, [y0,y1] = bottom ? W.bot : W.top, wellH = y1-y0;
+    const tw = W.w*0.985, U = (S.ar/wellH)*100, boxAsW = wellH/S.ar;
+    const step = Math.min(tw*0.231*0.86, (boxAsW - tw*0.6)/Math.max(count,1));
+    let inner = "";
+    for(let k=0;k<count;k++){
+      const isTop = k===count-1;
+      const y = (boxAsW - tw*0.108 - k*step - (isTop ? tw*0.115 : 0))*U;
+      inner += `<span class="bear" style="left:50%;top:${y}%;width:98.5%;--rr:${((k*37)%5-2)*0.8}deg;z-index:${k+1}">
+        <img src="/assets/board/chip-${isTop?"side":"edge"}-${ink}.png" alt=""></span>`;
+    }
+    h += `<span class="well" style="left:${(W.x-W.w/2)*100}%;top:${y0*100}%;width:${W.w*100}%;height:${wellH*100}%">
+      ${inner}<span class="shade"></span></span>`;
+  };
+  pile(true,  POS.off.w, "w");
+  pile(false, POS.off.b, "b");
+
+  // the throw, in the roller's own right-hand half
+  POS.dice.forEach((v,k)=>{
+    const x = (S.RX0 + (2.6 + k*1.3)*S.PT)*100, y = 50.5 + k*2.5;
+    h += `<span class="d3 ${POS.used[k]?"spent":""}" style="left:${x}%;top:${y}%;width:${dieW}%;aspect-ratio:1;
+      --h:${dieW/2}cqw;--ry:${k?36:8}deg">${dieFaces(v)}</span>`;
+  });
+
+  // the doubling cube, owned: it moves onto the bar on its owner's side.
+  const cubeW = S.well.w*0.95*100;
+  const cy = POS.cubeOwner==="you" ? S.BY*100 - cubeW*S.ar*0.62 : S.TY*100 + cubeW*S.ar*0.62;
+  h += `<span class="d3 cubie" style="left:${barX}%;top:${cy}%;width:${cubeW}%;aspect-ratio:1;--h:${cubeW/2}cqw">
+    <span class="cube"><span class="f top"><b style="font-size:${cubeW*0.62}cqw">${POS.cube}</b></span>
+    <span class="f fr"></span><span class="f sd"></span><span class="f bk"></span>
+    <span class="f rt"></span><span class="f bt"></span></span></span>`;
+
+  return `<div class="bd" style="--ar:${S.ar}"><img class="case" src="/assets/board/board-${setId}.jpg" alt="${S.name}">
+    <div class="layer">${h}</div></div>`;
+}
+
+/* The HUD vocabulary — identical for all twenty. */
+function hudHTML(){
+  const toks = [[5,false],[3,true]];
+  const ladder=(n)=>Array.from({length:15},(_,i)=>`<i class="${i<n?"on":""}"></i>`).join("");
+  const player=(who,name,ink,on,pips,off,score,clock,low,cube)=>`
+    <div class="p ${who} ${on?"on":"off"}">
+      <div class="top">
+        <span class="ava">${name[0]}</span>
+        <span class="who">
+          <b class="nm">${name}</b>
+          <span class="sub"><span class="disc ${ink}"></span>${on?"On roll":"Waiting"}</span>
+        </span>
+        <b class="clock mono${low?" low":""}">${clock}</b>
+      </div>
+      <div class="stats">
+        <span class="stat"><span class="k">Pips</span><span class="v">${pips}</span></span>
+        <span class="stat"><span class="k">Off</span><span class="v">${off}<small>/15</small></span></span>
+      </div>
+      <div class="lad">${ladder(off)}</div>
+      <div class="score"><b>${score}</b><span>/ 5 pts</span></div>
+      ${cube?`<span class="cube">Cube <b>${cube}</b></span>`:""}
+    </div>`;
+  return `
+    <div class="pot"><span class="k">Pot</span><span class="v">1 600 <i class="coin"></i></span>
+      <span class="s">800 each · winner takes all</span></div>
+    <div class="banner">Your turn — <b>play 5 and 3</b></div>
+    <div class="aux"><button class="btn">Rules</button><button class="btn">Sound</button></div>
+    ${player("you","Valeria","w",true,118,2,3,"2:41",false,2)}
+    ${player("foe","0xKai","b",false,131,1,1,"0:14",true,0)}
+    <button class="btn dgr resign">Resign</button>
+    <div class="tray"><span class="lbl">Moves</span><span class="toks">${
+      toks.map(([v,used])=>`<span class="tok${used?" used":""}">${PIPS[v].map(([x,y])=>`<i style="left:${x}%;top:${y}%"></i>`).join("")}</span>`).join("")
+    }</span></div>
+    <button class="cta">Confirm move</button>`;
+}
+
+/* ==========================================================================
+   THE TWENTY
+   ========================================================================== */
+const DESIGNS = [
+  {id:"ludo",      name:"Ludo Classic",      set:"rosso",
+   note:"The family HUD, unchanged. Pot top-left, turn banner top-centre, a player panel on each side, one yellow action bottom-right. Anyone who has played Chain Ludo already knows where to look.",
+   moves:"Nothing invented. Safest possible choice — it inherits every convention the other games already teach.",
+   tags:["Desktop","Family default","Lowest risk"]},
+  {id:"rail",      name:"Rail",              set:"green",
+   note:"Both players become full-width strips above and below the board, like a stadium scoreboard. The board gets the entire middle of the screen and grows noticeably bigger.",
+   moves:"Player panels stretched horizontally · pot moves into the top rail · biggest board of the twenty.",
+   tags:["Desktop","Biggest board","Scoreboard"]},
+  {id:"cards",     name:"Milled Cards",      set:"rosso",
+   note:"The luxury direction from the handover pack, re-cut in Chain colours: each player is a milled plate with a chamfered edge, a chrome nameplate and a leather face. The board stays the only round object.",
+   moves:"Chamfered plates instead of rounded cards · engraved labels · pot as the keystone above the board.",
+   tags:["Desktop","Luxury","Matches the asset pack"]},
+  {id:"cockpit",   name:"Cockpit",           set:"carbon",
+   note:"Everything collapses into one instrument binnacle under the board. Your eye never leaves the centre line — you look down, not sideways.",
+   moves:"No side panels at all · both players as gauges in a single console · board sits high and wide.",
+   tags:["Desktop","Single console","Fast reads"]},
+  {id:"bezel",     name:"Bezel",             set:"cognac",
+   note:"The HUD is the picture frame. Names, pips and score are set into the surround itself rather than floating in boxes beside it, so the screen reads as one object.",
+   moves:"A continuous frame around the board · values engraved into the rail · zero free-floating panels.",
+   tags:["Desktop","One object","Quiet"]},
+  {id:"column",    name:"Side Column",       set:"navy",
+   note:"One tall stat column down the left, board filling everything else. Best option if the match ever needs move history, chat or a spectator count — there is a natural place to put it.",
+   moves:"All HUD in a left rail · board flush right · room to grow without a redesign.",
+   tags:["Desktop","Expandable","Asymmetric"]},
+  {id:"broadcast", name:"Broadcast",         set:"rosso",
+   note:"Esports treatment: a score bug top-left, lower-third name bars over the board edge, and a ticker along the bottom. Made to be watched, not just played.",
+   moves:"Name bars overlap the board · persistent score bug · ticker strip for match state.",
+   tags:["Desktop","Spectator","Loud"]},
+  {id:"table",     name:"The Table",         set:"cognac",
+   note:"Your concept render as an interface: the case sits on a real table, names on brass plaques, the pot engraved on a plate at the rail. Warm, not technical.",
+   moves:"Wood + leather surround · brass nameplates · warm light instead of a flat dark field.",
+   tags:["Desktop","Warm","Concept render"]},
+  {id:"terminal",  name:"Terminal",          set:"titan",
+   note:"For players who count. Everything is monospace and tabular, laid out as a data window with column headers — pip difference, race read, checkers off, cube position.",
+   moves:"All numbers, no ornament · pip DIFFERENCE shown, not just the two totals · dense.",
+   tags:["Desktop","Serious players","Dense"]},
+  {id:"clock",     name:"Chess Clock",       set:"navy",
+   note:"The clock is the main object. Two large faces sit above the board and everything else shrinks under them — the right call if the money version is played at speed.",
+   moves:"Clocks become the biggest type on screen · pips and score demoted to a caption line.",
+   tags:["Desktop","Timed play","High pressure"]},
+  {id:"glass",     name:"Glass",             set:"navy",
+   note:"Frosted panels floating over the board instead of beside it. The leather shows through, so the table never feels boxed in — and the board can run right to the edges.",
+   moves:"Panels overlap the board with a blur · edge-to-edge playfield · thinnest chrome of the set.",
+   tags:["Desktop","Overlay","Modern"]},
+  {id:"slip",      name:"Betting Slip",      set:"rosso",
+   note:"The HUD as a printed slip: paper stock, perforated edges, monospace print, the pot as a totalled sum line. Leans all the way into the wager rather than hiding it.",
+   moves:"Paper white instead of dark cards · torn edges · pot printed as a receipt total.",
+   tags:["Desktop","Wager-forward","Distinctive"]},
+  {id:"blueprint", name:"Blueprint",         set:"titan",
+   note:"Technical-drawing overlay: hairline outlines, dimension leaders, small-caps labels. No fills anywhere. Reads as precision instrumentation rather than furniture.",
+   moves:"Outlines only, not a single gradient · measured leader lines to each value · very light on ink.",
+   tags:["Desktop","Technical","Minimal ink"]},
+  {id:"thumb",     name:"Thumb Zone",        set:"alcantara",
+   note:"Phone in landscape. Everything you touch is a right-hand column under the thumb; everything you only read is top-left, deliberately out of reach so it never gets hit by accident.",
+   moves:"Controls in one reachable column · board fills the rest · nothing interactive on the left.",
+   tags:["Mobile","Landscape","One-handed"]},
+  {id:"portrait",  name:"Portrait",          set:"green",
+   note:"Phone held upright. The opponent sits on top, you sit at the bottom, the board takes the middle and the action bar is pinned above the home indicator.",
+   moves:"Stacked vertically · opponent mirrored above · needs a portrait-proportioned board render.",
+   tags:["Mobile","Portrait","Needs new render"]},
+  {id:"minimal",   name:"Minimal",           set:"titan",
+   note:"No panels, no borders, no material at all — hairlines and type on black. The board is the only thing with weight, which makes it feel considerably larger than it is.",
+   moves:"Every surface removed · hierarchy carried by size and space alone · one yellow accent left.",
+   tags:["Desktop","Quietest","Board-first"]},
+  {id:"poker",     name:"Poker Room",        set:"green",
+   note:"Felt and a padded rail. The pot is not a label but an actual stack of chips that grows — you can see what is on the table without reading a number.",
+   moves:"Pot rendered as a chip stack · players seated at a rail · felt surround instead of flat dark.",
+   tags:["Desktop","Casino","Pot you can see"]},
+  {id:"bigtype",   name:"Big Type",          set:"green",
+   note:"Accessibility first. Roughly 1.4× type throughout, contrast above AAA, states written out in words rather than shown by colour, and hit targets a long way over the minimum.",
+   moves:"Larger type and targets · status spelled out, never colour-only · thick visible focus rings.",
+   tags:["Desktop","Accessible","AAA contrast"]},
+  {id:"arcade",    name:"Arcade",            set:"carbon",
+   note:"The loud one. Heavy glow, scanline sheen, scoreboard digits. Worth having in the set as the upper bound — if it is too much, that is useful information about where the line is.",
+   moves:"Seven-segment score digits · glow and scanlines · the only option that raises its voice.",
+   tags:["Desktop","Loud","Upper bound"]},
+  {id:"museum",    name:"Museum",            set:"cognac",
+   note:"The board as exhibit, the HUD as a wall label. Serif type, generous margins, everything set quietly beneath the object. The most expensive-feeling option in the set.",
+   moves:"Serif for names and titles · very generous whitespace · values as catalogue lines under the case.",
+   tags:["Desktop","Editorial","Most premium"]},
+];
+
+/* ── render the page ─────────────────────────────────────────────────────── */
+const jump = document.getElementById("jump");
+const opts = document.getElementById("opts");
+jump.innerHTML = DESIGNS.map((d,i)=>`<a href="#o${i+1}"><b>${String(i+1).padStart(2,"0")}</b>${d.name}</a>`).join("");
+opts.innerHTML = DESIGNS.map((d,i)=>`
+  <section class="opt" id="o${i+1}">
+    <div class="opt-head">
+      <span class="opt-no">${String(i+1).padStart(2,"0")}</span>
+      <div class="opt-id">
+        <h2>${d.name}</h2>
+        <p>${d.note}</p>
+      </div>
+      <div class="opt-tags">${d.tags.map(t=>`<span class="tag">${t}</span>`).join("")}
+        <span class="tag set">${SETS[d.set].name}</span></div>
+    </div>
+    <div class="frame">
+      <div class="stage" data-d="${d.id}">${hudHTML()}${boardHTML(d.set)}</div>
+    </div>
+    <div class="opt-moves"><b>What actually changes</b>${d.moves}</div>
+  </section>`).join("");
+</script>
+</body>
+</html>

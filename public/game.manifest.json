@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "gameId": "GammonGame",
+  "apiVersion": 1,
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "name": "Neo Gammon",
+      "description": "Backgammon match play with a real doubling cube. Race your fifteen checkers home, knock theirs onto the bar, and turn the cube when you smell blood — first to the match target takes the pot. 1v1, no house."
+    }
+  },
+  "presentation": { "mode": "full-iframe", "hostPanels": { "lobby": true, "history": false, "status": false } },
+  "lobby": { "minPlayers": 2, "maxPlayers": 2, "defaultBuyIn": "10000000", "autoStartWhenFull": true },
+  "capabilities": {
+    "createLobby": false,
+    "joinLobby": false,
+    "leaveLobby": false,
+    "startLobby": false,
+    "submitAction": true,
+    "cancelLobby": true,
+    "resize": true
+  }
+}

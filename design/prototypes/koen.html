@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KŌEN — art direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=Zen+Maru+Gothic:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   KŌEN 公園  — the quiet one
+   --------------------------------------------------------------------------
+   The opposite construction rule to Neo Gammon, on purpose. Where that one is
+   ink outlines and flat fills, this is PAINT: no outline anywhere, edges made
+   by the colour changing rather than by a line, one soft light from the top
+   left, and paper showing through everything.
+
+   Nothing on this screen shouts. The whole design bets that a betting game
+   feels more expensive when it is calm — the money is the loud part already.
+   ========================================================================== */
+:root{
+  --paper:#f7f1e3; --paper2:#efe6d2; --ink:#2b2a26; --soft:#7a7365;
+  --teal:#17706b; --coral:#e4694a; --gold:#c89b3f;
+  --serif:"Shippori Mincho", Georgia, serif;
+  --sans:"Zen Maru Gothic", system-ui, sans-serif;
+  --num:"JetBrains Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box; margin:0}
+body{background:#221f1a; color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased}
+.num{font-family:var(--num); font-variant-numeric:tabular-nums}
+[hidden]{display:none !important}
+
+.wrap{max-width:1500px; margin:0 auto; padding:30px 22px 70px}
+.head{display:flex; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:20px; color:var(--paper)}
+.head h1{font:400 clamp(34px,5vw,56px)/1 var(--serif); letter-spacing:.02em}
+.head h1 em{font-style:italic; color:var(--gold)}
+.head .jp{font:600 13px var(--serif); letter-spacing:.6em; color:var(--gold); margin-bottom:10px}
+.head p{flex:1 1 320px; font:400 13px/1.85 var(--sans); color:#b8b0a0; max-width:60ch}
+.head p b{color:var(--paper); font-weight:500}
+
+.nav{display:flex; gap:0; margin:0 0 16px; border-bottom:1px solid rgba(247,241,227,.18)}
+.nav button{font:500 12.5px var(--sans); letter-spacing:.16em; text-transform:uppercase; cursor:pointer;
+  padding:11px 20px; background:none; border:0; color:#9c9384; border-bottom:2px solid transparent}
+.nav button[aria-current="true"]{color:var(--paper); border-bottom-color:var(--gold)}
+
+/* ==========================================================================
+   STAGE
+   ========================================================================== */
+.stage{
+  position:relative; aspect-ratio:16/9; overflow:hidden; container-type:inline-size;
+  background:
+    radial-gradient(120% 90% at 22% 12%, #fbf7ec 0%, #f2e9d6 45%, #e3d7bf 100%);
+  box-shadow:0 30px 70px rgba(0,0,0,.5);
+}
+/* paper grain — the one texture, and it sits over everything */
+.stage::after{
+  content:""; position:absolute; inset:0; z-index:8; pointer-events:none; opacity:.5;
+  background-image:
+    repeating-linear-gradient(31deg, rgba(120,105,80,.045) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-64deg, rgba(120,105,80,.035) 0 1px, transparent 1px 4px);
+}
+.stage > *{z-index:2}
+
+/* ── board ────────────────────────────────────────────────────────────────── */
+.slot{position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:53cqw; container-type:inline-size}
+.board{position:relative; line-height:0; box-shadow:0 2cqw 4cqw rgba(60,48,28,.28)}
+.board > img{display:block; width:100%; height:auto; border-radius:.4cqw}
+.play{position:absolute; inset:0}
+
+/* Checkers as go stones: no outline at all. The form comes from one soft
+   highlight at the top left and the shadow it casts, nothing else. */
+.chk{
+  position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  background:var(--fill);
+  box-shadow:0 .28cqw .5cqw rgba(50,40,25,.34), inset -.18cqw -.28cqw .5cqw rgba(0,0,0,.22);
+  transition:top .3s cubic-bezier(.25,.9,.3,1);
+}
+.chk::before{
+  content:""; position:absolute; left:22%; top:16%; width:34%; height:26%; border-radius:50%;
+  background:var(--hi); filter:blur(.16cqw);
+}
+.chk.w{--fill:radial-gradient(120% 120% at 32% 26%, #fffdf7, #e8dec8 70%, #d6c9ae); --hi:rgba(255,255,255,.9)}
+.chk.b{--fill:radial-gradient(120% 120% at 32% 26%, #4a4740, #2a2823 65%, #171613); --hi:rgba(255,255,255,.28)}
+.chk.can{animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 .5cqw .9cqw rgba(50,40,25,.4), inset -.18cqw -.28cqw .5cqw rgba(0,0,0,.22)}}
+.chk.sel{box-shadow:0 .6cqw 1cqw rgba(50,40,25,.42), 0 0 0 .22cqw var(--gold)}
+
+/* a landing spot is a brushed ring, not a hard target */
+.spot{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  border:.2cqw solid rgba(23,112,107,.55); background:rgba(23,112,107,.09); animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{50%{transform:translate(-50%,-50%) scale(1.1); border-color:rgba(23,112,107,.85)}}
+
+.die{position:absolute; transform:translate(-50%,-50%) rotate(var(--r,0deg)); aspect-ratio:1;
+  border-radius:24%; background:linear-gradient(150deg,#fffdf6,#eadfc7);
+  box-shadow:0 .35cqw .6cqw rgba(50,40,25,.34), inset -.1cqw -.2cqw .4cqw rgba(0,0,0,.12)}
+.die i{position:absolute; width:18%; aspect-ratio:1; border-radius:50%; background:#3a3730; transform:translate(-50%,-50%)}
+.die.spent{opacity:.42}
+.cube{position:absolute; transform:translate(-50%,-50%) rotate(-6deg); aspect-ratio:1; display:grid; place-items:center;
+  border-radius:22%; background:linear-gradient(150deg,#d8ad50,#b6862f); color:#2b2a26;
+  box-shadow:0 .35cqw .6cqw rgba(50,40,25,.35); font:600 2.1cqw var(--num)}
+
+/* ── callout: an ink circle, brushed ─────────────────────────────────────── */
+.callout{
+  position:absolute; left:50%; top:42%; z-index:20; pointer-events:none;
+  width:22cqw; aspect-ratio:1; display:grid; place-items:center;
+  transform:translate(-50%,-50%) scale(.86); opacity:0;
+}
+.callout.in{opacity:1; transform:translate(-50%,-50%) scale(1); transition:all .42s cubic-bezier(.2,.9,.3,1)}
+.callout.out{opacity:0; transform:translate(-50%,-50%) scale(1.06); transition:all .45s ease}
+.co-burst{
+  position:absolute; inset:0; border-radius:50%;
+  background:rgba(247,241,227,.94);
+  box-shadow:0 1cqw 2.4cqw rgba(60,48,28,.3), inset 0 0 0 .28cqw var(--ink);
+  /* the enso — a brush circle, so the ring is broken where the stroke lifted */
+  -webkit-mask:conic-gradient(from 210deg, #000 0 84%, transparent 88% 100%);
+  mask:conic-gradient(from 210deg, #000 0 84%, transparent 88% 100%);
+}
+.callout.hot .co-burst{box-shadow:0 1cqw 2.4cqw rgba(60,48,28,.3), inset 0 0 0 .3cqw var(--coral)}
+.callout.good .co-burst{box-shadow:0 1cqw 2.4cqw rgba(60,48,28,.3), inset 0 0 0 .3cqw var(--teal)}
+.co-body{position:relative; z-index:1; text-align:center; color:var(--ink)}
+.co-big{display:flex; justify-content:center; gap:.6cqw; font:400 2.8cqw/1 var(--serif)}
+.co-word{display:block; margin-top:.7cqw; font:500 1.05cqw var(--sans); letter-spacing:.3em; text-transform:uppercase; color:var(--soft)}
+.co-face{position:relative; width:3cqw; aspect-ratio:1; border-radius:24%; display:inline-block;
+  background:linear-gradient(150deg,#fffdf6,#e6dac0); box-shadow:inset 0 0 0 .12cqw rgba(43,42,38,.25)}
+.co-face i{position:absolute; width:18%; aspect-ratio:1; border-radius:50%; background:#3a3730; transform:translate(-50%,-50%)}
+
+/* ==========================================================================
+   HUD — paper cards, one hairline rule, a vertical label. No boxes-in-boxes.
+   ========================================================================== */
+.plr{position:absolute; top:5cqw; width:18cqw; padding:1.2cqw 1.3cqw 1.3cqw 2.6cqw;
+  background:rgba(252,248,238,.9); box-shadow:0 .8cqw 2cqw rgba(60,48,28,.16)}
+.plr.you{left:2.4cqw}
+.plr.foe{right:2.4cqw}
+/* the vertical label down the spine — the only Japanese on the card */
+.plr::before{
+  content:attr(data-jp); position:absolute; left:.9cqw; top:1.2cqw; bottom:1.2cqw; width:1.1cqw;
+  writing-mode:vertical-rl; font:400 .78cqw var(--serif); letter-spacing:.34em; color:var(--soft);
+}
+.plr.on{box-shadow:0 1.2cqw 2.8cqw rgba(60,48,28,.24)}
+.plr.on::after{content:""; position:absolute; left:0; top:0; bottom:0; width:.22cqw; background:var(--coral)}
+.plr .nm{font:600 1.5cqw var(--serif); letter-spacing:.02em}
+.plr .st{margin-top:.28cqw; font:500 .7cqw var(--sans); letter-spacing:.24em; text-transform:uppercase; color:var(--soft)}
+.plr .rule{height:1px; background:rgba(43,42,38,.18); margin:.85cqw 0}
+.plr .row{display:flex; align-items:baseline; justify-content:space-between}
+.plr .row + .row{margin-top:.45cqw}
+.plr .row span{font:500 .74cqw var(--sans); letter-spacing:.2em; text-transform:uppercase; color:var(--soft)}
+.plr .row b{font:700 1.3cqw var(--num); color:var(--ink)}
+.plr .big{font:400 3cqw/1 var(--serif); color:var(--ink)}
+.plr .beads{display:flex; gap:.16cqw; margin-top:.7cqw}
+.plr .beads i{width:.42cqw; height:.42cqw; border-radius:50%; background:rgba(43,42,38,.16)}
+.plr .beads i.on{background:var(--teal)}
+
+.pot{position:absolute; left:50%; top:2cqw; transform:translateX(-50%); text-align:center}
+.pot .k{display:block; font:500 .74cqw var(--sans); letter-spacing:.46em; text-transform:uppercase; color:var(--soft)}
+.pot .v{display:block; font:400 2.4cqw/1 var(--serif); color:var(--ink); margin-top:.3cqw}
+.pot .s{display:block; font:500 .7cqw var(--sans); letter-spacing:.18em; color:var(--soft); margin-top:.4cqw}
+
+.dock{position:absolute; left:50%; bottom:2.2cqw; transform:translateX(-50%);
+  display:flex; align-items:center; gap:1.4cqw}
+.dock .lbl{font:500 .74cqw var(--sans); letter-spacing:.3em; text-transform:uppercase; color:var(--soft)}
+.toks{display:flex; gap:.4cqw}
+.tok{position:relative; width:2.2cqw; height:2.2cqw; border-radius:24%;
+  background:linear-gradient(150deg,#fffdf6,#e6dac0); box-shadow:0 .2cqw .35cqw rgba(60,48,28,.2)}
+.tok i{position:absolute; width:18%; aspect-ratio:1; border-radius:50%; background:#3a3730; transform:translate(-50%,-50%)}
+.tok.used{opacity:.4}
+
+.go{font:600 1.1cqw var(--serif); letter-spacing:.06em; padding:.85cqw 2.4cqw; cursor:pointer;
+  background:var(--teal); color:#f7f1e3; border:0; border-radius:99px;
+  box-shadow:0 .4cqw .9cqw rgba(23,112,107,.35); transition:transform .12s, box-shadow .12s}
+.go:hover{transform:translateY(-.1cqw); box-shadow:0 .6cqw 1.2cqw rgba(23,112,107,.4)}
+.go.alt{background:none; color:var(--soft); box-shadow:none; border:1px solid rgba(43,42,38,.25)}
+
+.mark{position:absolute; left:2.4cqw; bottom:2.2cqw; font:400 1.1cqw var(--serif); color:var(--soft); letter-spacing:.3em}
+.tools{position:absolute; right:2.4cqw; bottom:2.2cqw; display:flex; gap:1.2cqw}
+.tools button{font:500 .76cqw var(--sans); letter-spacing:.2em; text-transform:uppercase; cursor:pointer;
+  background:none; border:0; color:var(--soft); padding:.3cqw}
+.tools button:hover{color:var(--ink)}
+
+/* other screens */
+.sheet{position:absolute; inset:0; display:grid; place-items:center; padding:4cqw; z-index:5}
+.sheet .inner{width:min(64cqw,100%); text-align:center}
+.eyebrow{font:500 .82cqw var(--sans); letter-spacing:.5em; text-transform:uppercase; color:var(--soft)}
+.title{font:400 4.2cqw/1.05 var(--serif); margin-top:1.2cqw; color:var(--ink)}
+.title em{font-style:italic; color:var(--coral)}
+.score{display:flex; justify-content:center; align-items:flex-end; gap:4cqw; margin-top:2.6cqw}
+.score .side{display:flex; flex-direction:column; align-items:center; gap:.7cqw}
+.score .side b{font:400 5cqw/1 var(--serif)}
+.score .side span{font:500 .84cqw var(--sans); letter-spacing:.24em; text-transform:uppercase; color:var(--soft)}
+.score > i{font:400 2.4cqw var(--serif); font-style:normal; color:var(--soft); padding-bottom:1.2cqw}
+.note{margin-top:2cqw; font:400 1cqw/1.9 var(--sans); color:var(--soft)}
+.note b{color:var(--ink); font-weight:500}
+.row2{display:flex; gap:1.2cqw; justify-content:center; margin-top:2.6cqw; flex-wrap:wrap}
+.tables{display:grid; grid-template-columns:repeat(3,1fr); gap:1.4cqw; margin-top:2.4cqw}
+.tcard{background:rgba(252,248,238,.92); padding:1.4cqw; text-align:left; cursor:pointer;
+  box-shadow:0 .6cqw 1.6cqw rgba(60,48,28,.14); transition:transform .15s, box-shadow .15s}
+.tcard:hover{transform:translateY(-.3cqw); box-shadow:0 1.2cqw 2.4cqw rgba(60,48,28,.2)}
+.tcard h4{font:600 1.3cqw var(--serif)}
+.tcard .meta{margin-top:.4cqw; font:500 .72cqw var(--sans); letter-spacing:.16em; text-transform:uppercase; color:var(--soft)}
+.tcard .buy{margin-top:1cqw; font:400 1.7cqw var(--serif); color:var(--teal)}
+
+.tests{display:flex; gap:9px; margin-top:22px; flex-wrap:wrap}
+.tests button{font:500 12.5px var(--sans); letter-spacing:.1em; cursor:pointer; padding:11px 20px;
+  background:var(--paper); color:var(--ink); border:0; border-radius:99px}
+.legend{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:16px; margin-top:24px}
+.legend div{padding-left:14px; border-left:1px solid rgba(247,241,227,.25)}
+.legend h4{font:600 12px var(--serif); letter-spacing:.14em; text-transform:uppercase; color:var(--paper)}
+.legend h4 em{font-style:normal; color:var(--gold); letter-spacing:.3em; margin-left:6px}
+.legend p{margin-top:6px; font:400 12.5px/1.7 var(--sans); color:#a89f8e}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="jp">こうえん</div>
+      <h1>Kōen <em>公園</em></h1>
+    </div>
+    <p>The inverse rule to Neo Gammon, deliberately: <b>no outline anywhere</b>. Edges are made by the
+    colour changing, there is one soft light from the top left, and paper grain sits over everything.
+    Checkers are go stones. The bet is that a money game reads as more expensive when the interface
+    is calm — the stake is the loud part already.</p>
+  </header>
+
+  <nav class="nav">
+    <button data-goto="table" aria-current="true">Table</button>
+    <button data-goto="lobby">Lobby</button>
+    <button data-goto="between">Scoreline</button>
+    <button data-goto="win">Payout</button>
+  </nav>
+
+  <div class="stage" id="stage">
+    <div data-screen="table">
+      <div class="pot"><span class="k">Pot</span><span class="v num">1,600</span>
+        <span class="s">800 each · winner takes all</span></div>
+
+      <aside class="plr you on" data-jp="白・座一">
+        <div class="nm">Valeria</div><div class="st">On roll</div>
+        <div class="rule"></div>
+        <div class="row"><span>Pips</span><b class="big num">118</b></div>
+        <div class="beads" id="beadYou"></div>
+        <div class="rule"></div>
+        <div class="row"><span>Borne off</span><b class="num">2/15</b></div>
+        <div class="row"><span>Match</span><b class="num">3/5</b></div>
+      </aside>
+
+      <aside class="plr foe" data-jp="黒・座二">
+        <div class="nm">0xKai</div><div class="st">Waiting</div>
+        <div class="rule"></div>
+        <div class="row"><span>Pips</span><b class="big num">131</b></div>
+        <div class="beads" id="beadFoe"></div>
+        <div class="rule"></div>
+        <div class="row"><span>Borne off</span><b class="num">1/15</b></div>
+        <div class="row"><span>Match</span><b class="num">1/5</b></div>
+      </aside>
+
+      <div class="slot"><div class="board">
+        <img id="boardImg" src="/assets/neo/board-koen.png" alt="Kōen board">
+        <div class="play" id="play"></div></div></div>
+
+      <div class="dock">
+        <span class="lbl">Moves</span><span class="toks" id="toks"></span>
+        <button class="go" id="btnRoll">Roll</button>
+      </div>
+      <div class="mark">KŌEN</div>
+      <div class="tools"><button>Sound</button><button>Rules</button></div>
+    </div>
+
+    <div data-screen="lobby" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">Open tables</div>
+      <div class="title">Sit down<em>.</em></div>
+      <div class="tables">
+        <div class="tcard" data-goto="table"><h4>0xKai</h4>
+          <div class="meta">Match to 5 · waiting 0:42</div><div class="buy num">800 ◆</div></div>
+        <div class="tcard" data-goto="table"><h4>mona.eth</h4>
+          <div class="meta">Single game · waiting 2:17</div><div class="buy num">200 ◆</div></div>
+        <div class="tcard" data-goto="table"><h4>ryu_88</h4>
+          <div class="meta">Match to 7 · waiting 5:03</div><div class="buy num">2,000 ◆</div></div>
+      </div>
+      <div class="row2"><button class="go" data-goto="table">Create table</button></div>
+    </div></div></div>
+
+    <div data-screen="between" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">Match to 5 · game 3 done</div>
+      <div class="title">Game to <em>Valeria</em></div>
+      <div class="score">
+        <div class="side"><b class="num">3</b><span>Valeria</span></div><i>—</i>
+        <div class="side"><b class="num">1</b><span>0xKai</span></div>
+      </div>
+      <p class="note">A gammon, worth <b>two</b>. The pot does not move — <b>1,600 ◆</b> goes to whoever
+        takes the match. Two points left.</p>
+      <div class="row2"><button class="go alt" data-goto="lobby">Resign match</button>
+        <button class="go" data-goto="table">Next game</button></div>
+    </div></div></div>
+
+    <div data-screen="win" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">Match over</div>
+      <div class="title">The match is <em>yours</em></div>
+      <div class="score"><div class="side"><b class="num">+1,600</b><span>Paid out</span></div></div>
+      <p class="note">Taken <b>5–2</b>. Your stake of <b>800 ◆</b> comes back, and theirs with it.</p>
+      <div class="row2"><button class="go alt" data-goto="lobby">Lobby</button>
+        <button class="go" data-goto="table">Rematch · 800 ◆</button></div>
+    </div></div></div>
+  </div>
+
+  <div class="tests">
+    <button id="tRoll">▶ Roll the dice</button>
+    <button id="tDouble">▶ Doubles callout</button>
+    <button id="tHit">▶ Hit callout</button>
+    <button id="tSfx">▶ Sound set</button>
+  </div>
+
+  <div class="legend">
+    <div><h4>Type <em>書体</em></h4><p>Shippori Mincho for names and moments, Zen Maru Gothic for
+      labels, JetBrains Mono for numbers. Serif carries the tone here, not weight.</p></div>
+    <div><h4>Pieces <em>駒</em></h4><p>Go stones. No outline — the form is one soft highlight and the
+      shadow it casts. Shell white against slate.</p></div>
+    <div><h4>Callout <em>演出</em></h4><p>An <b>ensō</b> — a brushed ink circle with the stroke lifted
+      at the top. Contained, quiet, gone in under half a second.</p></div>
+    <div><h4>Sound <em>音</em></h4><p>Warm and wooden. A stone set on a board, a soft rattle for the
+      throw, a low hollow knock on a hit. Nothing sharp.</p></div>
+  </div>
+</div>
+
+<script src="/assets/neo/table.js"></script>
+<script>
+const POS = {
+  w:{5:2, 6:3, 8:2, 11:2, 13:3, 18:1}, b:{1:2, 3:1, 12:3, 17:3, 19:4},
+  bar:{w:0,b:1}, sel:13, can:[6,8,13], spots:[8,10],
+  dice:[5,3], used:[false,true], cube:2, cubeOwner:"you",
+};
+const stage=document.getElementById('stage'), play=document.getElementById('play');
+const SFX=NeoTable.makeSFX('wood');
+let GEOM;
+NeoTable.boot(document.getElementById('boardImg')).then(g=>{
+  GEOM=g; NeoTable.renderBoard(play,GEOM,POS,{chip:0.066});
+});
+const beads=(id,n)=>{document.getElementById(id).innerHTML=
+  Array.from({length:15},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')};
+beads('beadYou',2); beads('beadFoe',1);
+document.getElementById('toks').innerHTML=POS.dice
+  .map((v,k)=>`<span class="tok${POS.used[k]?' used':''}">${NeoTable.pips(v)}</span>`).join('');
+NeoTable.wireScreens(document.body);
+
+function doRoll(){
+  if(!GEOM) return;
+  NeoTable.rollDice(play, faces=>{
+    const dbl=faces[0]===faces[1];
+    NeoTable.callout(stage, dbl?'double':'roll', NeoTable.faceGlyphs(faces[0],faces[1]),
+      dbl?`${faces[0]} and ${faces[0]} — four moves`:null);
+    document.getElementById('toks').innerHTML=(dbl?[faces[0],faces[0],faces[0],faces[0]]:faces)
+      .map(v=>`<span class="tok">${NeoTable.pips(v)}</span>`).join('');
+  }, SFX);
+}
+document.getElementById('btnRoll').onclick=doRoll;
+document.getElementById('tRoll').onclick=doRoll;
+document.getElementById('tDouble').onclick=()=>{
+  NeoTable.callout(stage,'double',NeoTable.faceGlyphs(5,5),'five and five — four moves'); SFX.hit();};
+document.getElementById('tHit').onclick=()=>{
+  NeoTable.callout(stage,'hit','','sent to the bar'); SFX.hit();};
+document.getElementById('tSfx').onclick=()=>{
+  SFX.place(); setTimeout(SFX.roll,450); setTimeout(SFX.hit,1300); setTimeout(SFX.win,2000);};
+</script>
+</body>
+</html>

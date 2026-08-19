@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRIDRUNNER — art direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   GRIDRUNNER — the cold one
+   --------------------------------------------------------------------------
+   Construction rule: NOTHING IS FILLED. Every element is a hairline outline, a
+   corner bracket, or type. There is no card, no panel, no surface — the black
+   is the surface. The only solid shapes on the whole screen are the checkers,
+   which is what makes the position pop out of it without any effort.
+
+   It also shows the numbers a strong player actually wants and the others hide:
+   the pip DIFFERENCE and a live race read, not two totals to subtract yourself.
+   ========================================================================== */
+:root{
+  --bg:#05070a; --ink:#d8e6ee; --dim:#5d7382; --line:rgba(120,180,205,.28);
+  --cy:#35e6ff; --am:#ffb020; --hot:#ff3d6e;
+  --ui:"Chakra Petch", system-ui, sans-serif;
+  --num:"JetBrains Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box; margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--ui); -webkit-font-smoothing:antialiased}
+.num{font-family:var(--num); font-variant-numeric:tabular-nums}
+[hidden]{display:none !important}
+
+.wrap{max-width:1500px; margin:0 auto; padding:30px 22px 70px}
+.head{display:flex; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:18px}
+.head h1{font:700 clamp(30px,5vw,50px)/1 var(--ui); letter-spacing:.06em; text-transform:uppercase}
+.head h1 em{font-style:normal; color:var(--cy)}
+.head .jp{font:500 11px var(--num); letter-spacing:.5em; color:var(--am); margin-bottom:10px}
+.head p{flex:1 1 320px; font:400 13px/1.8 var(--ui); color:var(--dim); max-width:62ch}
+.head p b{color:var(--ink); font-weight:600}
+
+.nav{display:flex; gap:6px; margin:0 0 16px}
+.nav button{font:600 11.5px var(--ui); letter-spacing:.2em; text-transform:uppercase; cursor:pointer;
+  padding:9px 16px; background:none; color:var(--dim); border:1px solid var(--line)}
+.nav button[aria-current="true"]{color:var(--bg); background:var(--cy); border-color:var(--cy)}
+
+/* ==========================================================================
+   STAGE — brackets, not borders
+   ========================================================================== */
+.stage{
+  position:relative; aspect-ratio:16/9; overflow:hidden; container-type:inline-size;
+  background:
+    repeating-linear-gradient(0deg, rgba(120,180,205,.045) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, rgba(120,180,205,.045) 0 1px, transparent 1px 44px),
+    radial-gradient(70% 60% at 50% 45%, #0a1017, #04060a 80%);
+  border:1px solid var(--line);
+}
+/* corner registration brackets — the only "frame" this design gets */
+.stage::before, .stage::after{
+  content:""; position:absolute; width:5cqw; height:5cqw; pointer-events:none; z-index:9;
+}
+.stage::before{left:1.2cqw; top:1.2cqw; border-left:1px solid var(--cy); border-top:1px solid var(--cy)}
+.stage::after{right:1.2cqw; bottom:1.2cqw; border-right:1px solid var(--cy); border-bottom:1px solid var(--cy)}
+.stage > *{z-index:2}
+/* one scanline sweep, slow enough to be atmosphere not decoration */
+.scan{position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:linear-gradient(180deg, transparent 0 48%, rgba(53,230,255,.055) 50%, transparent 52% 100%);
+  animation:sweep 6.5s linear infinite}
+@keyframes sweep{from{transform:translateY(-100%)} to{transform:translateY(100%)}}
+
+/* ── board ────────────────────────────────────────────────────────────────── */
+.slot{position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:54cqw; container-type:inline-size}
+.board{position:relative; line-height:0; outline:1px solid var(--line); outline-offset:.5cqw}
+.board > img{display:block; width:100%; height:auto}
+.play{position:absolute; inset:0}
+
+/* the ONLY solid shapes on the screen */
+.chk{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1;
+  background:var(--fill); clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);
+  transition:top .14s linear}
+.chk::before{content:""; position:absolute; inset:22%;
+  clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); background:var(--core)}
+.chk.w{--fill:var(--cy); --core:#04252c}
+.chk.b{--fill:#2c3b45; --core:var(--am)}
+.chk.can::after{content:""; position:absolute; inset:-28%; border:1px solid var(--cy); border-radius:50%;
+  animation:ping 1.5s ease-out infinite}
+@keyframes ping{from{transform:scale(.7); opacity:1} to{transform:scale(1.15); opacity:0}}
+.chk.sel{outline:1px solid var(--ink); outline-offset:.3cqw}
+.spot{position:absolute; transform:translate(-50%,-50%) rotate(45deg); aspect-ratio:1;
+  border:1px solid var(--am); animation:spot 1.6s steps(2) infinite}
+@keyframes spot{50%{border-color:transparent}}
+
+.die{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1;
+  background:transparent; border:1px solid var(--cy)}
+.die i{position:absolute; width:15%; aspect-ratio:1; background:var(--cy); transform:translate(-50%,-50%)}
+.die.spent{border-color:var(--dim)} .die.spent i{background:var(--dim)}
+.cube{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; display:grid; place-items:center;
+  border:1px solid var(--am); color:var(--am); font:700 1.9cqw var(--num); background:rgba(255,176,32,.08)}
+
+/* ── callout: a bracketed readout, not a burst ───────────────────────────── */
+.callout{position:absolute; left:50%; top:40%; z-index:20; pointer-events:none;
+  width:24cqw; display:grid; place-items:center; transform:translate(-50%,-50%) scaleY(.4); opacity:0}
+.callout.in{opacity:1; transform:translate(-50%,-50%) scaleY(1); transition:all .12s steps(3)}
+.callout.out{opacity:0; transition:opacity .2s steps(2)}
+.co-burst{position:absolute; inset:0; background:rgba(5,7,10,.92); border:1px solid var(--cy)}
+.callout.hot .co-burst{border-color:var(--hot)}
+.callout.good .co-burst{border-color:var(--am)}
+/* the brackets that make it read as an instrument */
+.co-burst::before, .co-burst::after{content:""; position:absolute; width:1.6cqw; height:1.6cqw}
+.co-burst::before{left:-1px; top:-1px; border-left:3px solid var(--cy); border-top:3px solid var(--cy)}
+.co-burst::after{right:-1px; bottom:-1px; border-right:3px solid var(--cy); border-bottom:3px solid var(--cy)}
+.callout.hot .co-burst::before, .callout.hot .co-burst::after{border-color:var(--hot)}
+.co-body{position:relative; z-index:1; text-align:center; padding:1.4cqw 2cqw}
+.co-big{display:flex; justify-content:center; gap:.6cqw; font:700 2.6cqw/1 var(--num); color:var(--ink)}
+.co-word{display:block; margin-top:.8cqw; font:600 .95cqw var(--ui); letter-spacing:.38em;
+  text-transform:uppercase; color:var(--cy)}
+.callout.hot .co-word{color:var(--hot)}
+.co-face{position:relative; width:2.8cqw; aspect-ratio:1; display:inline-block; border:1px solid var(--cy)}
+.co-face i{position:absolute; width:15%; aspect-ratio:1; background:var(--cy); transform:translate(-50%,-50%)}
+
+/* ==========================================================================
+   HUD — readouts, no panels
+   ========================================================================== */
+.plr{position:absolute; top:5cqw; width:17cqw}
+.plr.you{left:3cqw} .plr.foe{right:3cqw; text-align:right}
+.plr .nm{font:700 1.35cqw var(--ui); letter-spacing:.1em; text-transform:uppercase}
+.plr.you .nm{color:var(--cy)} .plr.foe .nm{color:var(--am)}
+.plr .st{margin-top:.2cqw; font:400 .7cqw var(--num); letter-spacing:.24em; text-transform:uppercase; color:var(--dim)}
+.plr .hr{height:1px; background:var(--line); margin:.8cqw 0}
+.plr .r{display:flex; justify-content:space-between; align-items:baseline; margin-top:.35cqw}
+.plr.foe .r{flex-direction:row-reverse}
+.plr .r span{font:400 .68cqw var(--num); letter-spacing:.2em; text-transform:uppercase; color:var(--dim)}
+.plr .r b{font:700 1.05cqw var(--num)}
+.plr .big{font:700 2.6cqw/1 var(--num); letter-spacing:-.03em}
+.plr.on .big{color:var(--cy)}
+.plr .track{display:flex; gap:1px; height:.4cqw; margin-top:.7cqw}
+.plr.foe .track{flex-direction:row-reverse}
+.plr .track i{flex:1; background:rgba(120,180,205,.18)}
+.plr .track i.on{background:var(--cy)}
+.plr.foe .track i.on{background:var(--am)}
+
+/* the differential readout this design exists for */
+.diff{position:absolute; left:50%; top:2cqw; transform:translateX(-50%); text-align:center}
+.diff .k{display:block; font:400 .68cqw var(--num); letter-spacing:.4em; text-transform:uppercase; color:var(--dim)}
+.diff .v{display:block; font:700 2.2cqw/1 var(--num); color:var(--ink); margin-top:.25cqw}
+.diff .race{display:flex; align-items:center; gap:.5cqw; margin-top:.6cqw; justify-content:center}
+.diff .race .bar{width:9cqw; height:.35cqw; background:rgba(120,180,205,.18)}
+.diff .race .bar i{display:block; height:100%; width:61%; background:var(--cy)}
+.diff .race span{font:400 .66cqw var(--num); letter-spacing:.16em; color:var(--dim)}
+
+.dock{position:absolute; left:50%; bottom:2.4cqw; transform:translateX(-50%);
+  display:flex; align-items:center; gap:1.4cqw}
+.dock .lbl{font:400 .68cqw var(--num); letter-spacing:.3em; text-transform:uppercase; color:var(--dim)}
+.toks{display:flex; gap:.4cqw}
+.tok{position:relative; width:2cqw; height:2cqw; border:1px solid var(--cy)}
+.tok i{position:absolute; width:15%; aspect-ratio:1; background:var(--cy); transform:translate(-50%,-50%)}
+.tok.used{border-color:var(--dim)} .tok.used i{background:var(--dim)}
+.go{font:700 1cqw var(--ui); letter-spacing:.24em; text-transform:uppercase; padding:.8cqw 2.2cqw;
+  cursor:pointer; background:var(--cy); color:var(--bg); border:0; clip-path:polygon(.7cqw 0,100% 0,calc(100% - .7cqw) 100%,0 100%)}
+.go:hover{background:#7bf0ff}
+.go.alt{background:none; color:var(--dim); border:1px solid var(--line); clip-path:none}
+.mark{position:absolute; left:3cqw; bottom:2.6cqw; font:700 .8cqw var(--ui); letter-spacing:.36em; color:var(--dim)}
+.tools{position:absolute; right:3cqw; bottom:2.6cqw; display:flex; gap:1.2cqw}
+.tools button{font:400 .68cqw var(--num); letter-spacing:.22em; text-transform:uppercase; cursor:pointer;
+  background:none; border:0; color:var(--dim)}
+.tools button:hover{color:var(--cy)}
+
+/* other screens */
+.sheet{position:absolute; inset:0; display:grid; place-items:center; padding:4cqw; z-index:5}
+.sheet .inner{width:min(66cqw,100%); text-align:center}
+.eyebrow{font:400 .74cqw var(--num); letter-spacing:.5em; text-transform:uppercase; color:var(--am)}
+.title{font:700 3.6cqw/1.05 var(--ui); letter-spacing:.06em; text-transform:uppercase; margin-top:1.2cqw}
+.title em{font-style:normal; color:var(--cy)}
+.score{display:flex; justify-content:center; align-items:flex-end; gap:4cqw; margin-top:2.4cqw}
+.score .side{display:flex; flex-direction:column; align-items:center; gap:.6cqw}
+.score .side b{font:700 4.6cqw/1 var(--num)}
+.score .side span{font:600 .8cqw var(--ui); letter-spacing:.3em; text-transform:uppercase; color:var(--dim)}
+.score > i{font:400 2.2cqw var(--num); font-style:normal; color:var(--dim); padding-bottom:1cqw}
+.note{margin-top:1.8cqw; font:400 .95cqw/1.9 var(--ui); color:var(--dim)}
+.note b{color:var(--ink); font-weight:600}
+.row2{display:flex; gap:1cqw; justify-content:center; margin-top:2.4cqw; flex-wrap:wrap}
+.tables{display:grid; grid-template-columns:repeat(3,1fr); gap:1cqw; margin-top:2.2cqw}
+.tcard{border:1px solid var(--line); padding:1.2cqw; text-align:left; cursor:pointer; background:rgba(53,230,255,.02)}
+.tcard:hover{border-color:var(--cy); background:rgba(53,230,255,.06)}
+.tcard h4{font:700 1.2cqw var(--ui); letter-spacing:.06em; text-transform:uppercase}
+.tcard .meta{margin-top:.4cqw; font:400 .66cqw var(--num); letter-spacing:.16em; text-transform:uppercase; color:var(--dim)}
+.tcard .buy{margin-top:.9cqw; font:700 1.5cqw var(--num); color:var(--cy)}
+
+.tests{display:flex; gap:8px; margin-top:20px; flex-wrap:wrap}
+.tests button{font:600 11.5px var(--ui); letter-spacing:.16em; text-transform:uppercase; cursor:pointer;
+  padding:10px 18px; background:none; color:var(--ink); border:1px solid var(--line)}
+.tests button:hover{border-color:var(--cy); color:var(--cy)}
+.legend{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:16px; margin-top:24px}
+.legend div{padding-left:14px; border-left:1px solid var(--line)}
+.legend h4{font:600 11.5px var(--ui); letter-spacing:.24em; text-transform:uppercase}
+.legend h4 em{font-style:normal; color:var(--am); margin-left:6px}
+.legend p{margin-top:6px; font:400 12.5px/1.7 var(--ui); color:var(--dim)}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div><div class="jp">// GRID_RUNNER</div><h1>Grid<em>runner</em></h1></div>
+    <p>Construction rule: <b>nothing is filled</b>. Every element is a hairline, a corner bracket or
+    type — there is no card and no panel anywhere. The checkers are the only solid shapes on the
+    screen, which is what makes the position jump out of it. It also shows the number the others hide:
+    the <b>pip difference</b>, not two totals to subtract in your head.</p>
+  </header>
+
+  <nav class="nav">
+    <button data-goto="table" aria-current="true">Table</button>
+    <button data-goto="lobby">Lobby</button>
+    <button data-goto="between">Scoreline</button>
+    <button data-goto="win">Payout</button>
+  </nav>
+
+  <div class="stage" id="stage">
+    <div class="scan"></div>
+
+    <div data-screen="table">
+      <div class="diff">
+        <span class="k">Pip differential</span><span class="v num">−13</span>
+        <div class="race"><span>RACE</span><span class="bar"><i></i></span><span>61%</span></div>
+      </div>
+
+      <aside class="plr you on">
+        <div class="nm">Valeria</div><div class="st">On roll</div>
+        <div class="hr"></div>
+        <div class="big num">118</div>
+        <div class="track" id="trkYou"></div>
+        <div class="r"><span>Off</span><b class="num">2/15</b></div>
+        <div class="r"><span>Match</span><b class="num">3/5</b></div>
+        <div class="r"><span>Cube</span><b class="num">2</b></div>
+      </aside>
+
+      <aside class="plr foe">
+        <div class="nm">0xKai</div><div class="st">Waiting</div>
+        <div class="hr"></div>
+        <div class="big num">131</div>
+        <div class="track" id="trkFoe"></div>
+        <div class="r"><span>Off</span><b class="num">1/15</b></div>
+        <div class="r"><span>Match</span><b class="num">1/5</b></div>
+        <div class="r"><span>Clock</span><b class="num">0:14</b></div>
+      </aside>
+
+      <div class="slot"><div class="board">
+        <img id="boardImg" src="/assets/neo/board-grid.png" alt="Gridrunner board">
+        <div class="play" id="play"></div></div></div>
+
+      <div class="dock">
+        <span class="lbl">Moves</span><span class="toks" id="toks"></span>
+        <button class="go" id="btnRoll">Roll</button>
+      </div>
+      <div class="mark">GRIDRUNNER</div>
+      <div class="tools"><button>Sound</button><button>Rules</button></div>
+    </div>
+
+    <div data-screen="lobby" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">// open_tables</div>
+      <div class="title">Select <em>opponent</em></div>
+      <div class="tables">
+        <div class="tcard" data-goto="table"><h4>0xKai</h4>
+          <div class="meta">match_to 5 · 0:42</div><div class="buy num">800 ◆</div></div>
+        <div class="tcard" data-goto="table"><h4>mona.eth</h4>
+          <div class="meta">single · 2:17</div><div class="buy num">200 ◆</div></div>
+        <div class="tcard" data-goto="table"><h4>ryu_88</h4>
+          <div class="meta">match_to 7 · 5:03</div><div class="buy num">2,000 ◆</div></div>
+      </div>
+      <div class="row2"><button class="go" data-goto="table">Create table</button></div>
+    </div></div></div>
+
+    <div data-screen="between" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">// match_to 5 · game 3 resolved</div>
+      <div class="title">Game <em>Valeria</em></div>
+      <div class="score"><div class="side"><b class="num">3</b><span>Valeria</span></div><i>:</i>
+        <div class="side"><b class="num">1</b><span>0xKai</span></div></div>
+      <p class="note">Gammon · ×2. Pot unchanged at <b>1,600 ◆</b> — settles to the match winner.
+        Remaining to target: <b>2</b>.</p>
+      <div class="row2"><button class="go alt" data-goto="lobby">Resign</button>
+        <button class="go" data-goto="table">Next game</button></div>
+    </div></div></div>
+
+    <div data-screen="win" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">// match_resolved</div>
+      <div class="title">Payout <em>confirmed</em></div>
+      <div class="score"><div class="side"><b class="num">+1,600</b><span>settled</span></div></div>
+      <p class="note">Final <b>5–2</b>. Stake <b>800 ◆</b> returned plus opponent stake.</p>
+      <div class="row2"><button class="go alt" data-goto="lobby">Lobby</button>
+        <button class="go" data-goto="table">Rematch · 800 ◆</button></div>
+    </div></div></div>
+  </div>
+
+  <div class="tests">
+    <button id="tRoll">▶ Roll the dice</button>
+    <button id="tDouble">▶ Doubles callout</button>
+    <button id="tHit">▶ Hit callout</button>
+    <button id="tSfx">▶ Sound set</button>
+  </div>
+
+  <div class="legend">
+    <div><h4>Type <em>//</em></h4><p>Chakra Petch for labels, JetBrains Mono for every number and every
+      machine-ish string. Two cuts, both technical.</p></div>
+    <div><h4>Pieces <em>//</em></h4><p>Hex tokens with a cut core — cyan for you, amber for them.
+      A movable checker pings a ring rather than lifting.</p></div>
+    <div><h4>Callout <em>//</em></h4><p>A bracketed readout that snaps open in three steps, no easing.
+      It reports rather than celebrates.</p></div>
+    <div><h4>Sound <em>//</em></h4><p>Short synthetic UI blips and data chirps. Square waves, no tails,
+      nothing warm.</p></div>
+  </div>
+</div>
+
+<script src="/assets/neo/table.js"></script>
+<script>
+const POS={w:{5:2,6:3,8:2,11:2,13:3,18:1}, b:{1:2,3:1,12:3,17:3,19:4},
+  bar:{w:0,b:1}, sel:13, can:[6,8,13], spots:[8,10],
+  dice:[5,3], used:[false,true], cube:2, cubeOwner:"you"};
+const stage=document.getElementById('stage'), play=document.getElementById('play');
+const SFX=NeoTable.makeSFX('data');
+let GEOM;
+NeoTable.boot(document.getElementById('boardImg')).then(g=>{
+  GEOM=g; NeoTable.renderBoard(play,GEOM,POS,{chip:0.062});
+});
+const trk=(id,n)=>{document.getElementById(id).innerHTML=
+  Array.from({length:15},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')};
+trk('trkYou',2); trk('trkFoe',1);
+document.getElementById('toks').innerHTML=POS.dice
+  .map((v,k)=>`<span class="tok${POS.used[k]?' used':''}">${NeoTable.pips(v)}</span>`).join('');
+NeoTable.wireScreens(document.body);
+
+function doRoll(){
+  if(!GEOM) return;
+  NeoTable.rollDice(play, faces=>{
+    const dbl=faces[0]===faces[1];
+    NeoTable.callout(stage, dbl?'double':'roll', NeoTable.faceGlyphs(faces[0],faces[1]),
+      dbl?`DOUBLE ${faces[0]} · 4 MOVES`:`${faces[0]} + ${faces[1]}`);
+    document.getElementById('toks').innerHTML=(dbl?[faces[0],faces[0],faces[0],faces[0]]:faces)
+      .map(v=>`<span class="tok">${NeoTable.pips(v)}</span>`).join('');
+  }, SFX);
+}
+document.getElementById('btnRoll').onclick=doRoll;
+document.getElementById('tRoll').onclick=doRoll;
+document.getElementById('tDouble').onclick=()=>{
+  NeoTable.callout(stage,'double',NeoTable.faceGlyphs(5,5),'DOUBLE 5 · 4 MOVES'); SFX.hit();};
+document.getElementById('tHit').onclick=()=>{
+  NeoTable.callout(stage,'hit','','BLOT SENT TO BAR'); SFX.hit();};
+document.getElementById('tSfx').onclick=()=>{
+  SFX.place(); setTimeout(SFX.roll,400); setTimeout(SFX.hit,1200); setTimeout(SFX.win,1800);};
+</script>
+</body>
+</html>

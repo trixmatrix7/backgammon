@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEO GAMMON — art direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=M+PLUS+1+Code:wght@500;700&family=Bungee&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   NEO GAMMON
+   --------------------------------------------------------------------------
+   One art direction, built out properly.
+
+   The rule that makes it read as anime rather than "a dark UI with anime
+   colours": CEL SHADING IS A CONSTRUCTION METHOD, not a filter. Every single
+   shape is (1) a flat fill, (2) a thick black ink outline, (3) exactly one
+   hard-edged highlight, (4) one flat cast shadow. No soft gradients, no blur,
+   no glow anywhere. The moment one element cheats with a gradient the whole
+   screen falls back to looking generic.
+
+   The board is the generated key art. Everything ON it — checkers, dice, the
+   cube, the HUD — is drawn in code in the same language, because those need
+   live states (movable, selected, any die face) that a flat render can't give.
+   ========================================================================== */
+
+:root{
+  --ink:#12101c;            /* the one black. every outline is this */
+  --paper:#faf3d8;
+  --lav:#a9a4d4;
+  --orange:#f5793f;
+  --mag:#e5177f;
+  --cyan:#29a8e0;
+  --indigo:#3b2fb5;
+  --line:4px;               /* outline weight at reference scale */
+  --jp:"Zen Kaku Gothic New", system-ui, sans-serif;
+  --num:"M PLUS 1 Code", ui-monospace, monospace;
+  --badge:"Bungee", sans-serif;
+}
+*{box-sizing:border-box; margin:0}
+html,body{height:100%}
+body{
+  background:var(--ink); color:var(--paper); font-family:var(--jp);
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+.num{font-family:var(--num); font-variant-numeric:tabular-nums; font-style:normal}
+
+/* halftone screentone — the texture that does the most work.
+   A real dot screen, not a noise image. */
+.tone{
+  background-image:radial-gradient(currentColor 1.4px, transparent 1.5px);
+  background-size:7px 7px;
+}
+
+/* ── page frame ───────────────────────────────────────────────────────────── */
+
+.wrap{max-width:1500px; margin:0 auto; padding:26px 22px 70px}
+.pagehead{display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:20px}
+.pagehead h1{
+  font:900 clamp(30px,5vw,52px)/0.92 var(--jp); letter-spacing:-.03em; text-transform:uppercase;
+  transform:skewX(-7deg); color:var(--paper);
+  text-shadow:5px 5px 0 var(--mag), 10px 10px 0 var(--ink);
+}
+.pagehead .jp{font:700 13px var(--jp); letter-spacing:.5em; color:var(--lav); margin-bottom:8px}
+.pagehead p{flex:1 1 340px; font:400 13.5px/1.75 var(--jp); color:#b9b4d0; max-width:62ch}
+.pagehead p b{color:var(--paper); font-weight:700}
+
+/* ==========================================================================
+   THE STAGE
+   ========================================================================== */
+
+.stage{
+  position:relative; border:var(--line) solid var(--ink); border-radius:6px; overflow:hidden;
+  aspect-ratio:16/9; container-type:inline-size;
+  background:#1a1730;
+  box-shadow:12px 12px 0 var(--ink);
+}
+.stage .backdrop{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.85}
+/* the room gets darkened and screentoned so the board always wins */
+.stage::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:1; color:#0b0918; opacity:.35;
+  background-image:radial-gradient(currentColor 1.4px, transparent 1.5px); background-size:8px 8px;
+}
+/* z-index only — every child brings its own `position`, and re-declaring it here
+   would beat their more specific absolute placement and dump them into flow. */
+.stage > *:not(.backdrop){z-index:2}
+
+/* diagonal speed lines behind the board — pure anime punctuation */
+.speed{
+  position:absolute; inset:0; z-index:1; pointer-events:none; opacity:.5;
+  background:repeating-linear-gradient(114deg,
+    transparent 0 26px, rgba(250,243,216,.05) 26px 27px, transparent 27px 60px);
+  -webkit-mask:radial-gradient(58% 52% at 50% 50%, transparent 55%, #000 92%);
+  mask:radial-gradient(58% 52% at 50% 50%, transparent 55%, #000 92%);
+}
+
+/* ── the board ────────────────────────────────────────────────────────────── */
+
+.boardslot{
+  position:absolute; left:50%; top:52%; transform:translate(-50%,-50%);
+  width:56cqw; container-type:inline-size;
+}
+.board{position:relative; line-height:0; border:var(--line) solid var(--ink); border-radius:3px;
+  box-shadow:8px 8px 0 rgba(18,16,28,.55)}
+.board > img{display:block; width:100%; height:auto}
+.board .play{position:absolute; inset:0}
+
+/* checkers — the cel-shading recipe, in four layers and nothing else */
+.chk{
+  position:absolute; transform:translate(-50%,-50%);
+  aspect-ratio:1; border-radius:50%;
+  border:0.55cqw solid var(--ink);          /* (2) the ink outline */
+  background:var(--fill);                   /* (1) the flat fill  */
+  box-shadow:0 0.5cqw 0 var(--rim), 0 0.5cqw 0 0.55cqw var(--ink);  /* the disc's thickness */
+  transition:top .18s cubic-bezier(.3,1.6,.5,1), filter .12s;
+}
+.chk::before{                                /* (3) ONE hard crescent highlight */
+  content:""; position:absolute; inset:14%; border-radius:50%;
+  border:0.5cqw solid var(--hi); border-color:var(--hi) transparent transparent var(--hi);
+  transform:rotate(-38deg);
+}
+.chk.w{--fill:#fdfbf2; --rim:var(--mag); --hi:rgba(18,16,28,.5)}
+.chk.b{--fill:#2b2540; --rim:var(--cyan); --hi:rgba(253,251,242,.75)}
+/* a movable checker is physically raised — no glow, ever */
+.chk.can{filter:drop-shadow(0 0 0 var(--ink))}
+.chk.sel{outline:0.5cqw dashed var(--paper); outline-offset:0.3cqw}
+
+/* landing spot: a hand-inked target, not a tint */
+.spot{
+  position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  border:0.5cqw dashed var(--paper); opacity:.9;
+  animation:spot-spin 6s linear infinite;
+}
+@keyframes spot-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* dice — same four layers, built as flat faces.
+   Pips are placed by coordinate, NOT by a padded grid: percentage padding
+   resolves against the containing block's width, so `padding:14%` on a 41px
+   die would have taken 14% of the 590px board and blown the box up. */
+.die{
+  position:absolute; transform:translate(-50%,-50%) rotate(var(--r,0deg));
+  aspect-ratio:1; border-radius:22%; background:var(--indigo);
+  border:0.5cqw solid var(--ink);
+  box-shadow:0 0.55cqw 0 #2a1f8c, 0 0.55cqw 0 0.5cqw var(--ink);
+}
+.die i{
+  position:absolute; width:19%; aspect-ratio:1; border-radius:50%;
+  background:var(--mag); transform:translate(-50%,-50%);
+}
+.die.spent{filter:grayscale(1) brightness(.55)}
+
+/* the doubling cube */
+.cube{
+  position:absolute; transform:translate(-50%,-50%) rotate(-8deg); aspect-ratio:1;
+  display:grid; place-items:center; border-radius:20%;
+  background:#fdfbf2; border:0.55cqw solid var(--ink);
+  box-shadow:0 0.6cqw 0 #b9b2d6, 0 0.6cqw 0 0.55cqw var(--ink);
+  font:700 2.4cqw var(--num); color:var(--cyan);
+}
+
+/* ==========================================================================
+   HUD — manga panels. Hard-cut corners, thick ink, screentone fills.
+   ========================================================================== */
+
+.panel{
+  position:absolute; background:var(--paper); color:var(--ink);
+  border:var(--line) solid var(--ink); box-shadow:0.6cqw 0.6cqw 0 var(--ink);
+}
+/* every panel is cut on the same 3 angles, so they read as one set */
+.cut{clip-path:polygon(0 0, 100% 0, 100% calc(100% - 1.1cqw), calc(100% - 1.1cqw) 100%, 0 100%)}
+
+/* — player plates — */
+.plr{width:20cqw; padding:.85cqw 1cqw 1cqw; top:4.5cqw}
+.plr.you{left:2cqw}
+.plr.foe{right:2cqw; background:#2b2540; color:var(--paper); border-color:var(--ink)}
+.plr .name{
+  display:flex; align-items:center; gap:.5cqw; font:900 1.5cqw/1 var(--jp);
+  letter-spacing:-.02em; text-transform:uppercase; transform:skewX(-6deg);
+}
+.plr .name .disc{width:1.1cqw; height:1.1cqw; border-radius:50%; border:.28cqw solid var(--ink); flex:none}
+.plr.you .name .disc{background:#fdfbf2; box-shadow:0 0 0 .22cqw var(--mag)}
+.plr.foe .name .disc{background:#2b2540; box-shadow:0 0 0 .22cqw var(--cyan)}
+.plr .kana{font:700 .72cqw var(--jp); letter-spacing:.34em; opacity:.6; margin-top:.35cqw}
+.plr .row{display:flex; align-items:flex-end; gap:.8cqw; margin-top:.7cqw}
+.plr .big{font:700 2.6cqw/1 var(--num); letter-spacing:-.04em}
+.plr .unit{font:700 .7cqw var(--jp); letter-spacing:.2em; padding-bottom:.35cqw; opacity:.65}
+.plr .bar{
+  height:.85cqw; margin-top:.6cqw; border:.28cqw solid var(--ink); background:transparent;
+  display:flex; gap:.12cqw; padding:.12cqw;
+}
+.plr .bar i{flex:1; background:transparent}
+.plr .bar i.on{background:var(--mag)}
+.plr.foe .bar i.on{background:var(--cyan)}
+.plr .foot{display:flex; justify-content:space-between; align-items:baseline; margin-top:.6cqw;
+  font:700 .78cqw var(--jp); letter-spacing:.14em; text-transform:uppercase; opacity:.72}
+.plr .foot b{font:700 1.15cqw var(--num); opacity:1}
+/* the ACTIVE plate is stamped: it tilts, gains a tone fill and throws a hard shadow */
+.plr.on{transform:rotate(-1.2deg) scale(1.03); box-shadow:1.1cqw 1.1cqw 0 var(--mag)}
+.plr.on::before{
+  content:"手番"; position:absolute; top:-1.5cqw; left:-.6cqw;
+  padding:.2cqw .6cqw .28cqw; background:var(--mag); color:var(--paper);
+  border:var(--line) solid var(--ink); font:700 .85cqw var(--jp); letter-spacing:.3em;
+  transform:rotate(-3deg);
+}
+
+/* — pot, centred above the board so a long name can never move it — */
+.pot{
+  left:50%; top:1.6cqw; transform:translateX(-50%) rotate(-.6deg);
+  padding:.5cqw 1.6cqw .7cqw; text-align:center; background:var(--mag); color:var(--paper);
+}
+.pot .k{display:block; font:700 .78cqw var(--jp); letter-spacing:.42em; opacity:.85}
+.pot .v{display:block; font:700 2.1cqw/1 var(--num); letter-spacing:-.03em; margin-top:.15cqw}
+.pot .s{display:block; font:700 .7cqw var(--jp); letter-spacing:.16em; opacity:.8; margin-top:.3cqw}
+
+/* — the console: move tray + the one action — */
+.dock{
+  left:50%; bottom:1.8cqw; transform:translateX(-50%);
+  display:flex; align-items:center; gap:1.2cqw; padding:.7cqw .9cqw; background:var(--paper);
+}
+.dock .lbl{font:700 .78cqw var(--jp); letter-spacing:.3em; color:var(--ink); opacity:.6}
+.dock .toks{display:flex; gap:.45cqw}
+.tok{
+  position:relative; width:2.4cqw; height:2.4cqw; border-radius:18%;
+  background:var(--indigo); border:.3cqw solid var(--ink); cursor:pointer;
+}
+.tok i{
+  position:absolute; width:19%; aspect-ratio:1; border-radius:50%;
+  background:var(--mag); transform:translate(-50%,-50%);
+}
+.tok.used{filter:grayscale(1) brightness(.6)}
+
+/* THE action. Exactly one on screen, and it is the only thing that moves on its own. */
+.go{
+  font:900 1.35cqw var(--jp); letter-spacing:-.01em; text-transform:uppercase;
+  padding:.9cqw 2.2cqw; background:var(--orange); color:var(--ink);
+  border:var(--line) solid var(--ink); cursor:pointer; transform:skewX(-7deg);
+  box-shadow:.55cqw .55cqw 0 var(--ink); transition:transform .08s, box-shadow .08s;
+}
+.go span{display:block; transform:skewX(7deg)}
+.go:hover{transform:skewX(-7deg) translate(-.15cqw,-.15cqw); box-shadow:.75cqw .75cqw 0 var(--ink)}
+.go:active{transform:skewX(-7deg) translate(.35cqw,.35cqw); box-shadow:.2cqw .2cqw 0 var(--ink)}
+
+/* — corner furniture — */
+.logo{
+  left:2cqw; bottom:1.8cqw; padding:.45cqw .9cqw .55cqw; background:var(--ink); color:var(--paper);
+  border:.3cqw solid var(--paper); font-family:var(--badge); font-size:1.05cqw; letter-spacing:.06em;
+  transform:rotate(-2deg);
+}
+.logo em{font-style:normal; color:var(--orange)}
+.tools{right:2cqw; bottom:1.8cqw; display:flex; gap:.5cqw; background:none; border:0; box-shadow:none}
+.tools button{
+  font:700 .82cqw var(--jp); letter-spacing:.14em; text-transform:uppercase; cursor:pointer;
+  padding:.5cqw .9cqw; background:var(--paper); color:var(--ink); border:.3cqw solid var(--ink);
+  box-shadow:.3cqw .3cqw 0 var(--ink);
+}
+.tools button:active{transform:translate(.2cqw,.2cqw); box-shadow:none}
+
+/* ==========================================================================
+   IMPACT FRAME — the anime beat. Fires on a hit.
+   White blowout, radial burst lines, a screentone ring, one katakana stamp.
+   ========================================================================== */
+/* `.fire`, not `.go` — `.go` is the action button's class and would style this too. */
+.impact{position:absolute; inset:0; z-index:9; display:none; pointer-events:none}
+.impact.fire{display:block}
+.impact .flash{position:absolute; inset:0; background:var(--paper); animation:flash .38s steps(1) forwards}
+@keyframes flash{0%{opacity:1}30%{opacity:0}45%{opacity:.85}60%{opacity:0}100%{opacity:0}}
+.impact .burst{
+  position:absolute; left:50%; top:50%; width:150%; aspect-ratio:1; transform:translate(-50%,-50%);
+  background:repeating-conic-gradient(from 0deg, var(--ink) 0 3deg, transparent 3deg 9deg);
+  -webkit-mask:radial-gradient(circle, #000 8%, transparent 62%);
+  mask:radial-gradient(circle, #000 8%, transparent 62%);
+  animation:burst .5s cubic-bezier(.1,.8,.3,1) forwards;
+}
+@keyframes burst{from{transform:translate(-50%,-50%) scale(.2) rotate(0)}to{transform:translate(-50%,-50%) scale(1) rotate(22deg); opacity:0}}
+.impact .stamp{
+  position:absolute; left:50%; top:48%; transform:translate(-50%,-50%) rotate(-9deg);
+  font:900 9cqw/1 var(--jp); color:var(--mag); letter-spacing:-.04em;
+  -webkit-text-stroke:.7cqw var(--ink); paint-order:stroke fill;
+  animation:stamp .55s cubic-bezier(.2,1.7,.4,1) forwards;
+}
+@keyframes stamp{
+  0%{transform:translate(-50%,-50%) rotate(-9deg) scale(2.4); opacity:0}
+  22%{opacity:1}
+  55%{transform:translate(-50%,-50%) rotate(-9deg) scale(1)}
+  100%{transform:translate(-50%,-50%) rotate(-9deg) scale(1.04); opacity:0}
+}
+
+/* ── caption under the stage ──────────────────────────────────────────────── */
+.legend{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-top:26px}
+.legend div{border-left:4px solid var(--mag); padding:2px 0 2px 13px}
+.legend h4{font:900 12px var(--jp); letter-spacing:.16em; text-transform:uppercase; color:var(--paper)}
+.legend h4 em{font-style:normal; color:var(--lav); font-weight:700; letter-spacing:.3em; margin-left:6px}
+.legend p{margin-top:5px; font:400 12.5px/1.65 var(--jp); color:#a8a3c2}
+.legend p b{color:var(--paper); font-weight:700}
+.controls{display:flex; gap:10px; margin-top:22px; flex-wrap:wrap}
+.controls button{
+  font:900 13px var(--jp); letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+  padding:11px 20px; background:var(--paper); color:var(--ink); border:3px solid var(--ink);
+  box-shadow:5px 5px 0 var(--mag);
+}
+.controls button:active{transform:translate(3px,3px); box-shadow:2px 2px 0 var(--mag)}
+
+@media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="pagehead">
+    <div>
+      <div class="jp">ネオ・ギャモン</div>
+      <h1>Neo Gammon</h1>
+    </div>
+    <p>
+      One art direction, built all the way out. The rule underneath it: <b>cel shading is a
+      construction method, not a filter</b> — every shape is a flat fill, a thick ink outline, exactly
+      one hard highlight and one flat shadow. No gradients, no blur, no glow anywhere on the screen.
+      That is the whole difference between this and a dark UI with anime colours on it.
+    </p>
+  </header>
+
+  <div class="stage" id="stage">
+    <img class="backdrop" src="/assets/neo/backdrop.png" alt="">
+    <div class="speed"></div>
+
+    <div class="panel pot cut">
+      <span class="k">POT</span>
+      <span class="v num">1,600</span>
+      <span class="s">800 EACH · WINNER TAKES ALL</span>
+    </div>
+
+    <aside class="panel plr you on cut" id="plrYou">
+      <div class="name"><span class="disc"></span>VALERIA</div>
+      <div class="kana">ホワイト</div>
+      <div class="row"><span class="big num">118</span><span class="unit">PIPS</span></div>
+      <div class="bar" id="barYou"></div>
+      <div class="foot"><span>Borne off</span><b class="num">2/15</b></div>
+      <div class="foot"><span>Match</span><b class="num">3/5</b></div>
+    </aside>
+
+    <aside class="panel plr foe cut" id="plrFoe">
+      <div class="name"><span class="disc"></span>0xKAI</div>
+      <div class="kana">ブラック</div>
+      <div class="row"><span class="big num">131</span><span class="unit">PIPS</span></div>
+      <div class="bar" id="barFoe"></div>
+      <div class="foot"><span>Borne off</span><b class="num">1/15</b></div>
+      <div class="foot"><span>Match</span><b class="num">1/5</b></div>
+    </aside>
+
+    <div class="boardslot">
+      <div class="board">
+        <img src="/assets/neo/board-dusk.png" alt="Neo Gammon board">
+        <div class="play" id="play"></div>
+      </div>
+    </div>
+
+    <div class="panel dock cut">
+      <span class="lbl">残り</span>
+      <span class="toks" id="toks"></span>
+      <button class="go" id="go"><span>Confirm move</span></button>
+    </div>
+
+    <div class="panel logo">NEO <em>GAMMON</em></div>
+    <div class="panel tools">
+      <button id="bSound">Sound</button>
+      <button id="bRules">Rules</button>
+    </div>
+
+    <div class="impact" id="impact">
+      <div class="flash"></div><div class="burst"></div><div class="stamp">ドン！</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playHit">▶ Impact frame (hit)</button>
+    <button id="playRoll">▶ Roll the dice</button>
+    <button id="playSfx">▶ Sound set</button>
+  </div>
+
+  <div class="legend">
+    <div>
+      <h4>Type <em>書体</em></h4>
+      <p><b>Zen Kaku Gothic New</b> 900 for names and the action, skewed 7° so it reads as drawn
+      rather than set. <b>M PLUS 1 Code</b> for every number. <b>Bungee</b> for the wordmark only.</p>
+    </div>
+    <div>
+      <h4>Board <em>盤</em></h4>
+      <p>Generated key art: orange and cream points on dusk lavender, ink outlines, screentone in the
+      corners, hand-hatched centre bar. Everything on top is drawn in code so it can hold live states.</p>
+    </div>
+    <div>
+      <h4>Pieces <em>駒</em></h4>
+      <p>Flat fill, ink ring, one crescent highlight, and a coloured under-rim that gives the disc real
+      thickness. Magenta rim = yours, cyan = theirs. Movable checkers physically lift.</p>
+    </div>
+    <div>
+      <h4>Motion <em>動き</em></h4>
+      <p>Nothing eases politely. Checkers land on an overshoot spring, the active plate is stamped at a
+      tilt, and a hit fires a full impact frame — blowout, radial burst, katakana.</p>
+    </div>
+    <div>
+      <h4>Sound <em>音</em></h4>
+      <p>Short, dry, percussive. A woodblock knock for a placed checker, a rattle-and-clack for the
+      throw, and a low hit with a metallic ring on top. Nothing sustained, nothing ambient.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   Board geometry — measured off the generated key art.
+   Both halves are a regular 6-column grid; the two starts and the pitch are
+   the only numbers the whole layer needs.
+   ========================================================================== */
+/* Measured off the key art itself, not guessed: a scanline across the top row gives the twelve
+   column centres, and the row where point coverage collapses to zero gives how far the points
+   reach in. Re-run that measurement if the board art is ever regenerated. */
+const G = {
+  COLS:[0.0551,0.1316,0.2102,0.2859,0.3621,0.4391,  // left half, outer → inner
+        0.5613,0.6375,0.7148,0.7906,0.8680,0.9449], // right half, inner → outer
+  TOP_TIP:0.375, BOT_TIP:0.635,
+  CHIP:0.066,                          // checker width, fraction of board width
+  AR:1280/832,
+};
+const chipH = G.CHIP * G.AR * 100;     // that same width, as a % of board HEIGHT
+
+/* the position on show: mid-game, both sides bearing off, one on the bar */
+const POS = {
+  w:{5:2, 6:3, 8:2, 11:2, 13:3, 18:1},
+  b:{1:2, 3:1, 12:3, 17:3, 19:4},
+  bar:{w:0, b:1}, sel:13, spots:[8,10], dice:[5,3], used:[false,true], cube:2,
+};
+
+/* Point number → the x centre of its column, in % of board width. Numbering is from the seated
+   player's view: 1-6 own home (bottom right, 1 outermost), 7-12 own outer (bottom left),
+   13-18 opponent outer (top left), 19-24 opponent home (top right). Index straight into the
+   measured table so there is no formula that can drift away from the picture. */
+const colX = (n) => {
+  const i = n <= 6  ? 11 - (6 - n)     // 1 → 11 (far right), 6 → 6
+          : n <= 12 ? 12 - n           // 7 → 5,  12 → 0 (far left)
+          : n <= 18 ? n - 13           // 13 → 0, 18 → 5
+          :           n - 13;          // 19 → 6, 24 → 11
+  return G.COLS[i] * 100;
+};
+const isTop = (n) => n>=13;
+
+const play = document.getElementById('play');
+
+/* Pip coordinates as percentages of the die face, so a face is correct at any size. */
+const PIP = {
+  1:[[50,50]],
+  2:[[28,28],[72,72]],
+  3:[[26,26],[50,50],[74,74]],
+  4:[[28,28],[72,28],[28,72],[72,72]],
+  5:[[26,26],[74,26],[50,50],[26,74],[74,74]],
+  6:[[30,24],[70,24],[30,50],[70,50],[30,76],[70,76]],
+};
+const pips = (v) => PIP[v].map(([x,y])=>`<i style="left:${x}%;top:${y}%"></i>`).join('');
+
+function draw(){
+  let h = '';
+  const put = (n, count, ink) => {
+    const x = colX(n), top = isTop(n);
+    const base = top ? 0 : 100;
+    const step = Math.min(chipH*0.86, ((top?G.TOP_TIP:1-G.BOT_TIP)*100 - chipH*0.6)/Math.max(count-1,1));
+    for(let i=0;i<count;i++){
+      const y = top ? base + chipH*0.62 + i*step : base - chipH*0.62 - i*step;
+      const isTopChip = i===count-1;
+      const cls = 'chk '+ink + (n===POS.sel && isTopChip ? ' sel' : '');
+      h += `<span class="${cls}" style="left:${x}%;top:${y}%;width:${G.CHIP*100}%;z-index:${10+i}"></span>`;
+    }
+  };
+  for(const n in POS.w) put(+n, POS.w[n], 'w');
+  for(const n in POS.b) put(+n, POS.b[n], 'b');
+
+  // the bar sits dead centre between the innermost column of each half
+  const barX = ((G.COLS[5] + G.COLS[6]) / 2) * 100;
+  for(let i=0;i<POS.bar.b;i++)
+    h += `<span class="chk b" style="left:${barX}%;top:${42 - i*chipH*0.9}%;width:${G.CHIP*100}%;z-index:30"></span>`;
+
+  // landing spots
+  for(const n of POS.spots){
+    const top = isTop(n);
+    const y = top ? chipH*0.62 : 100 - chipH*0.62;
+    h += `<span class="spot" style="left:${colX(n)}%;top:${y}%;width:${G.CHIP*100}%;z-index:8"></span>`;
+  }
+
+  // the throw, in the right-hand half
+  POS.dice.forEach((v,k)=>{
+    h += `<span class="die${POS.used[k]?' spent':''}" id="die${k}"
+      style="left:${G.COLS[8+k]*100}%;top:${47+k*7}%;width:${G.CHIP*1.05*100}%;--r:${k?12:-9}deg;z-index:40">${pips(v)}</span>`;
+  });
+
+  // the cube, parked on the owner's side of the bar
+  h += `<span class="cube" style="left:${barX}%;top:88%;width:${G.CHIP*1.1*100}%;z-index:40">${POS.cube}</span>`;
+
+  play.innerHTML = h;
+}
+draw();
+
+/* bear-off ladders */
+const ladder=(el,n)=>{ el.innerHTML = Array.from({length:15},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join(''); };
+ladder(document.getElementById('barYou'), 2);
+ladder(document.getElementById('barFoe'), 1);
+
+/* move tray — what the throw still owes */
+document.getElementById('toks').innerHTML = POS.dice
+  .map((v,k)=>`<span class="tok${POS.used[k]?' used':''}">${pips(v)}</span>`).join('');
+
+/* ==========================================================================
+   SOUND — short, dry, percussive. Synthesised so the direction is audible
+   without shipping a single file; the real build swaps in samples with the
+   same envelopes.
+   ========================================================================== */
+let AC;
+const ac = () => (AC ||= new (window.AudioContext||window.webkitAudioContext)());
+
+function tone({f=400, to=null, type='sine', dur=.12, vol=.3, at=0, curve='exp'}){
+  const c=ac(), t=c.currentTime+at;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t);
+  if(to) o.frequency.exponentialRampToValueAtTime(to, t+dur);
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol, t+.004);
+  if(curve==='exp') g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+  else g.gain.linearRampToValueAtTime(0, t+dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t+dur+.02);
+}
+function noise({dur=.09, vol=.25, at=0, hp=900, lp=6000}){
+  const c=ac(), t=c.currentTime+at, n=Math.floor(c.sampleRate*dur);
+  const b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.2);
+  const s=c.createBufferSource(); s.buffer=b;
+  const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=(hp+lp)/2; f.Q.value=.7;
+  const g=c.createGain(); g.gain.value=vol;
+  s.connect(f).connect(g).connect(c.destination); s.start(t);
+}
+const SFX = {
+  place(){ tone({f:520,to:300,type:'triangle',dur:.09,vol:.28}); noise({dur:.05,vol:.12,at:0}); },
+  roll(){ for(let i=0;i<6;i++) noise({dur:.05,vol:.16,at:i*.055+Math.random()*.02});
+          tone({f:180,to:120,type:'square',dur:.14,vol:.13,at:.30});
+          tone({f:240,to:150,type:'triangle',dur:.12,vol:.16,at:.36}); },
+  hit(){ tone({f:120,to:55,type:'square',dur:.20,vol:.32});
+         tone({f:1420,to:820,type:'sine',dur:.30,vol:.16,at:.02});
+         noise({dur:.14,vol:.3}); },
+  win(){ [0,2,4,7].forEach((s,i)=> tone({f:392*Math.pow(2,s/12),type:'triangle',dur:.26,vol:.22,at:i*.075})); },
+};
+
+/* ── the demos ────────────────────────────────────────────────────────────── */
+const impact = document.getElementById('impact');
+function fireImpact(){
+  SFX.hit();
+  impact.classList.remove('fire'); void impact.offsetWidth; impact.classList.add('fire');
+  setTimeout(()=>impact.classList.remove('fire'), 600);
+}
+document.getElementById('playHit').onclick = fireImpact;
+document.getElementById('go').onclick = fireImpact;
+
+document.getElementById('playRoll').onclick = ()=>{
+  SFX.roll();
+  [0,1].forEach(k=>{
+    const d=document.getElementById('die'+k); if(!d) return;
+    let n=0;
+    const iv=setInterval(()=>{
+      d.innerHTML = pips(1+Math.floor(Math.random()*6));
+      d.style.setProperty('--r', (Math.random()*40-20)+'deg');
+      if(++n>7){ clearInterval(iv); d.style.setProperty('--r',(k?12:-9)+'deg'); SFX.place(); }
+    }, 55+k*12);
+  });
+};
+document.getElementById('playSfx').onclick = ()=>{
+  SFX.place(); setTimeout(SFX.roll,420); setTimeout(SFX.hit,1250); setTimeout(SFX.win,1850);
+};
+document.getElementById('bSound').onclick = ()=>SFX.place();
+document.getElementById('bRules').onclick = ()=>SFX.place();
+</script>
+</body>
+</html>

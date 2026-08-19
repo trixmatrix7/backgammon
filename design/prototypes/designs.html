@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backgammon — art directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0d14; --ink:#f4f2ee; --dim:#8d879c; --hot:#ff1f7a; --lime:#c6ff2e;
+  --ui:"Zen Kaku Gothic New",system-ui,sans-serif; --num:"JetBrains Mono",monospace}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--ui);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:44px 22px 90px}
+h1{font:900 clamp(32px,5.4vw,54px)/.95 var(--ui);letter-spacing:-.03em;text-transform:uppercase;
+  transform:skewX(-8deg);text-shadow:5px 5px 0 var(--hot),10px 10px 0 var(--lime),15px 15px 0 var(--bg)}
+.sub{margin-top:22px;font:500 14px/1.8 var(--ui);color:var(--dim);max-width:70ch}
+.sub b{color:var(--ink);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:38px}
+a.card{display:block;text-decoration:none;color:inherit;border:3px solid #24212f;background:#15141d;
+  transition:border-color .15s,transform .15s}
+a.card:hover{border-color:var(--lime);transform:translateY(-3px)}
+a.card .shot{aspect-ratio:16/9;overflow:hidden;background:#0a0910}
+a.card .shot img{width:100%;height:100%;object-fit:cover;display:block}
+a.card .body{padding:16px 17px 19px}
+a.card h2{font:900 20px var(--ui);letter-spacing:-.01em}
+a.card h2 em{font-style:normal;color:var(--lime)}
+a.card .tag{margin-top:6px;font:700 10.5px var(--num);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+a.card p{margin-top:10px;font:500 12.5px/1.65 var(--ui);color:#a49dab}
+a.card .go{margin-top:13px;display:inline-block;font:900 11.5px var(--ui);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--bg);background:var(--lime);padding:7px 13px;transform:skewX(-8deg)}
+.note{margin-top:34px;padding:15px 17px;border-left:3px solid var(--hot);font:500 12.5px/1.7 var(--ui);color:var(--dim)}
+.note b{color:var(--ink);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Backgammon<br>art directions</h1>
+  <p class="sub">Four complete directions, each with its own board, pieces, typeface, motion and sound.
+  Every one has the <b>table, lobby, scoreline and payout</b> screens, and buttons to fire the dice,
+  the callouts and the sound set so they can actually be judged rather than looked at. All four run on
+  the same engine — the board's grid is <b>measured out of the picture at runtime</b>, so a new board
+  drops straight in.</p>
+
+  <div class="grid">
+    <a class="card" href="/neo-gammon.html">
+      <div class="shot"><img src="/assets/neo/board-dusk.png" alt=""></div>
+      <div class="body">
+        <h2>Neo <em>Gammon</em></h2>
+        <div class="tag">v1 · the first one · keep</div>
+        <p>Cel-shaded anime. Flat fills, thick ink outlines, one hard highlight, no gradients anywhere.
+          Orange and cream on dusk lavender.</p>
+        <span class="go">Open</span>
+      </div>
+    </a>
+
+    <a class="card" href="/neo-max.html">
+      <div class="shot"><img src="/assets/neo/board-max.png" alt=""></div>
+      <div class="body">
+        <h2>Neo Gammon <em>MAX</em></h2>
+        <div class="tag">same rule, pushed · 4 screens</div>
+        <p>Hot magenta and lime on violet-black, heavier screentone, drifting speed lines, table shake.
+          The impact frame is now a contained burst, not a full-screen flash.</p>
+        <span class="go">Open</span>
+      </div>
+    </a>
+
+    <a class="card" href="/koen.html">
+      <div class="shot"><img src="/assets/neo/board-koen.png" alt=""></div>
+      <div class="body">
+        <h2>Kōen <em>公園</em></h2>
+        <div class="tag">the quiet one · painted</div>
+        <p>The inverse rule: no outline anywhere, edges made by colour, one soft light. Go stones,
+          serif type, an ensō for the callout.</p>
+        <span class="go">Open</span>
+      </div>
+    </a>
+
+    <a class="card" href="/gridrunner.html">
+      <div class="shot"><img src="/assets/neo/board-grid.png" alt=""></div>
+      <div class="body">
+        <h2>Grid<em>runner</em></h2>
+        <div class="tag">the cold one · hairlines</div>
+        <p>Nothing is filled — every element is a hairline or a bracket, so the checkers are the only
+          solid shapes. Shows the pip differential instead of two totals.</p>
+        <span class="go">Open</span>
+      </div>
+    </a>
+
+    <a class="card" href="/blockparty.html">
+      <div class="shot"><img src="/assets/neo/board-clay.png" alt=""></div>
+      <div class="body">
+        <h2>Block <em>Party</em></h2>
+        <div class="tag">the friendly one · clay</div>
+        <p>Everything has thickness: solid coloured sides under every element, and pressing squashes
+          them. Squash-and-stretch motion throughout.</p>
+        <span class="go">Open</span>
+      </div>
+    </a>
+  </div>
+
+  <p class="note"><b>Not shown here:</b> the older experiments — <code>/design-options.html</code>
+  (the 20 HUD layouts built on the handover renders) — are still on disk but superseded.</p>
+</div>
+</body>
+</html>

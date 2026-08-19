@@ -1,0 +1,1434 @@
+/* ==========================================================================
+   NEO GAMMON — the shipped design
+   --------------------------------------------------------------------------
+   Construction rule, and it is the whole thing: every shape is a FLAT FILL, a
+   THICK INK OUTLINE, exactly ONE hard highlight and ONE flat shadow. No
+   gradients, no blur, no glow anywhere. Cel shading is a construction method,
+   not a filter — the moment one element cheats, the screen reads as a dark UI
+   with anime colours rather than as drawn.
+
+   Sizing: the stage is the container. `cqw` inside it is 1% of the stage width,
+   so the whole screen scales as one unit and nothing needs a media query.
+   Careful: elements that declare their own `container-type` (the board slot)
+   re-base cqw onto themselves — see the note there.
+   ========================================================================== */
+
+:root {
+  --ink: #0d0a18;
+  --paper: #fdfbf2;
+  --hot: #ff1f7a;
+  --lime: #c6ff2e;
+  --violet: #2a1150;
+  --deep: #160828;
+  /* ── type ──────────────────────────────────────────────────────────────────
+     One family for the whole game: Yusei Magic, a marker-drawn Japanese face.
+     Hand-lettered top to bottom — the same hand that would write a manga sound
+     effect also writes the labels and the pot, which is why the screen reads as
+     one object rather than as art with an interface bolted to it.
+
+     The three slots stay, because they still describe different JOBS:
+       display — what the game SAYS   (titles, pot, the one main action, callouts)
+       ui      — what the game LABELS (labels, body, buttons, statuses)
+       num     — what the game COUNTS (pips, pot, score, clock — always tabular)
+     They simply all resolve to the same face now. Keeping the slots means a future
+     change is one line, not a search across the stylesheet.
+
+     Numbers are set with `tabular-nums`, never from a monospace: a coding font's
+     dotted zero belongs in an editor, and a game counts things rather than
+     printing code. */
+  --display: "Yusei Magic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ui: var(--display);
+  --num: var(--display);
+  --display-weight: 400;
+  --display-track: 0;
+  /* alias kept so older rules resolve into the system */
+  --jp: var(--ui);
+  --badge: var(--display);
+}
+
+/* ── iframe sizing ────────────────────────────────────────────────────────────
+   The host sizes our frame from the height we REPORT (capabilities.resize +
+   observeGameContentSize). That makes `height: 100%` circular — it resolves
+   against a containing block whose height we are the ones supplying — and an
+   absolutely-positioned stage on top of it takes the whole game out of flow, so
+   the document measures ~0 and the frame collapses to a strip.
+
+   So the shell carries a real, intrinsic height: a 16:9 box derived from the
+   width the host gives us. Everything inside can then go on filling it
+   absolutely, and the observer has something true to report. */
+html,
+body,
+#root {
+  height: auto;
+  min-height: 0;
+}
+body { overflow: hidden; }
+.shell {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.neo,
+.neo * {
+  box-sizing: border-box;
+}
+.neo .num {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-style: normal;
+}
+
+/* ── stage ────────────────────────────────────────────────────────────────── */
+
+.neo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  background: var(--deep);
+  font-family: var(--jp);
+  color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+.neo-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+}
+/* screentone belongs to the ROOM only — never over the board or the panels */
+.neo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  color: #0b0616;
+  opacity: 0.4;
+  background-image: radial-gradient(currentColor 1.5px, transparent 1.6px);
+  background-size: 8px 8px;
+}
+.neo-speed {
+  position: absolute;
+  inset: -20%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.26;
+  background: repeating-linear-gradient(
+    112deg, transparent 0 30px, rgba(253, 251, 242, 0.07) 30px 32px, transparent 32px 68px);
+  -webkit-mask: radial-gradient(56% 50% at 50% 50%, transparent 52%, #000 90%);
+  mask: radial-gradient(56% 50% at 50% 50%, transparent 52%, #000 90%);
+  animation: neo-drift 9s linear infinite;
+}
+@keyframes neo-drift { to { transform: translateX(68px); } }
+.neo > *:not(.neo-bg) { z-index: 3; }
+/* A hit used to shake the whole stage. It moved the board, the cards and the dock
+   together, which meant the one thing you were watching — a checker landing — was
+   the one thing that jumped out from under you. The impact now stays where the
+   impact is: a flash on the layer above the board, nothing that occupies space and
+   nothing that moves. */
+.neo-hitflash {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background: radial-gradient(50% 40% at 50% 50%, rgba(255, 31, 122, 0.34), transparent 70%);
+  animation: neo-hitflash 0.34s ease-out forwards;
+}
+@keyframes neo-hitflash {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── the table: pot · board · dice + key, stacked as one unit ─────────────── */
+
+.neo-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  /* The board is what you actually look at; the cards are read once a turn. Sized against BOTH axes
+     so it grows into a wide window without ever pushing the dock off a short one. */
+  width: min(58cqw, calc(74cqh * 1.4906));
+  container-type: inline-size; /* NB: cqw below is now 1% of the BOARD, not the stage */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.neo-pot {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 1.1cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.3cqw;
+  /* Fixed, because the column is centred: if this row grows when the cube tag
+     appears, the whole table re-centres and the BOARD slides under the player's
+     hands mid-turn. Everything above and below the board reserves its space. */
+  height: 6.4cqw;
+}
+
+/* ── board ────────────────────────────────────────────────────────────────── */
+
+.nb {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+  border: 0.85cqw solid var(--ink);
+  box-shadow: 1cqw 1cqw 0 rgba(13, 10, 24, 0.6);
+}
+.nb-art { display: block; width: 100%; height: auto; -webkit-user-drag: none; }
+.nb-layer { position: absolute; inset: 0; }
+
+.nb-chk {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+  background: var(--stein) center / contain no-repeat;
+  filter: drop-shadow(0 0.34cqw 0.42cqw rgba(0, 0, 0, 0.42));
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2), top 0.2s cubic-bezier(0.3, 1.7, 0.5, 1);
+  pointer-events: none;
+}
+.nb-chk.w { --stein: url("/assets/neo/neo-stein-w.png"); }
+.nb-chk.b { --stein: url("/assets/neo/neo-stein-b.png"); }
+
+/* The move markers are drilled into the piece, not hung around it. The drawn disc does NOT sit in
+   the middle of its own PNG — the art carries the depth as an offset slab — so both markers are
+   centred on the silver rim at 56.4 % / 44.6 %, which is what keeps the circle parallel to the
+   outline. Violet, because magenta and lime already belong to the board. */
+.nb-chk.can::after,
+.nb-chk.sel::after {
+  content: "";
+  position: absolute;
+  left: 56.4%;
+  top: 44.6%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+/* stage 1 — every checker that can move */
+.nb-chk.can { z-index: 34 !important; }
+.nb-chk.can::after {
+  width: 57%;
+  aspect-ratio: 1;
+  border: 0.42cqw solid #6a2bff;
+  box-shadow: 0 0 1cqw #7a4bff, inset 0 0 0.9cqw #7a4bff;
+  animation: neo-pulse 1.6s ease-in-out infinite;
+}
+@keyframes neo-pulse { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+/* stage 2 — the one you picked up */
+.nb-chk.sel { transform: translate(-50%, -56%) scale(1.05); z-index: 36 !important; }
+.nb-chk.sel::after {
+  width: 80%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle at 50% 50%, #d8c4ff 0%, #8a5cfff7 24%, #6a2bffd6 50%, #5a2be08c 76%, #5a2be029 100%);
+}
+/* The journey itself is driven by the Web Animations API (see Hop in Board.tsx):
+   the number of waypoints depends on the die, which no static keyframe can express. */
+.nb-chk.flying { z-index: 60; filter: drop-shadow(0 0.6cqw 0.5cqw rgba(0, 0, 0, 0.55)); }
+
+.nb-count {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 38;
+  display: grid;
+  place-items: center;
+  width: 3cqw;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font: 700 1.3cqw var(--num);
+  pointer-events: none;
+}
+
+.nb-spot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 0.45cqw dashed var(--lime);
+  z-index: 8;
+  cursor: pointer;
+  animation: neo-spin 5s linear infinite;
+}
+.nb-spot.faint { opacity: 0.4; pointer-events: none; }
+@keyframes neo-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+.nb-hit { position: absolute; transform: translateX(-50%); z-index: 44; cursor: pointer; }
+
+.nb-off {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 2.4;
+  border-radius: 0.3cqw;
+  border: 0.3cqw solid var(--ink);
+  background: var(--fill);
+  pointer-events: none;
+}
+.nb-off.w { --fill: #fdfbf2; }
+.nb-off.b { --fill: #241040; }
+.nb-offzone {
+  position: absolute;
+  right: 0;
+  width: 9%;
+  height: 34%;
+  z-index: 45;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 0.4cqw var(--lime);
+}
+
+.nb-die {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(var(--r, 0deg));
+  aspect-ratio: 1;
+  border-radius: 22%;
+  background: #8a5cff;
+  border: 0.5cqw solid var(--ink);
+  box-shadow: 0 0.55cqw 0 #5a2be0, 0 0.55cqw 0 0.5cqw var(--ink);
+  z-index: 40;
+  pointer-events: none;
+}
+.nb-die i {
+  position: absolute;
+  width: 19%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 0.22cqw solid var(--ink);
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+}
+.nb-die.spent { filter: grayscale(1) brightness(0.6); }
+
+.nb-cube {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 20%;
+  background: #8bd41f;
+  color: var(--ink);
+  border: 0.5cqw solid var(--ink);
+  box-shadow: 0 0.5cqw 0 #5d9410, 0 0.5cqw 0 0.5cqw var(--ink);
+  font: 700 2.3cqw var(--num);
+  z-index: 40;
+  transition: top 0.5s cubic-bezier(0.2, 0.8, 0.25, 1);
+  pointer-events: none;
+}
+.nb-cube.pending { animation: neo-offer 0.9s ease-in-out infinite alternate; }
+@keyframes neo-offer { to { transform: translate(-50%, -50%) rotate(-8deg) scale(1.12); } }
+
+.nb-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 70;
+  padding: 1cqw 2cqw;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0.4cqw solid var(--paper);
+  font: 900 1.5cqw var(--jp);
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── dice tray + the one action ───────────────────────────────────────────── */
+/* No housing bar. Laying tokens over drawn holes could never line up, so the
+   holes are gone: the dice stand on their own and nothing else defines where
+   they sit. */
+
+.neo-dock {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  margin-top: 1.5cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  /* same reason as the pot row: the dock's contents change every turn (two tokens
+     or four, undo appearing, the label growing) and none of that may move the board */
+  height: 8.6cqw;
+}
+.neo-toks { display: flex; gap: 0.85cqw; }
+/* cqw, not % — a percentage here would resolve against an auto-width flexbox */
+.neo-tok {
+  position: relative;
+  width: 5.6cqw;
+  aspect-ratio: 1;
+  border-radius: 0.6cqw;
+  background: var(--paper);
+  border: 0.5cqw solid var(--ink);
+  box-shadow: 0 0.5cqw 0 #b3accd, 0 0.5cqw 0 0.5cqw var(--ink);
+  padding: 0;
+  cursor: default;
+}
+.neo-tok i {
+  position: absolute;
+  width: 19%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--hot);
+  transform: translate(-50%, -50%);
+}
+.neo-tok.used { filter: grayscale(1) brightness(0.72); }
+.neo-tok.live { cursor: pointer; }
+.neo-tok.armed { outline: 0.4cqw solid var(--lime); outline-offset: 0.3cqw; }
+
+/* The drawn key — the standalone one, cropped to its artwork (measured off the
+   rendered alpha: 108.7/164.3 at 51.2%/50.7%, ratio 2.646). It is a wide slanted
+   keycap with a real side under it, so the press has something to travel into. */
+.neo-go {
+  position: relative;
+  flex: none;
+  width: 21cqw;
+  aspect-ratio: 2.646;
+  cursor: pointer;
+  background: url("/assets/neo/ui-roll-cut.png") 51.2% 50.7% / 108.7% 164.3% no-repeat;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  font: 900 2.4cqw var(--jp);
+  text-transform: uppercase;
+  display: grid;
+  place-items: center;
+  transition: transform 0.07s;
+}
+/* the face is a parallelogram sitting above the side, so the label rides high */
+.neo-go span { display: block; transform: skewX(-14deg) translateY(-12%); }
+.neo-go:hover:not(:disabled) { transform: translateY(-0.25cqw); }
+.neo-go:active:not(:disabled) { transform: translateY(0.5cqw); }
+/* "not yet", not "broken" — desaturating the hero action to grey reads as a
+   dead control. It stays lime, just held back. */
+.neo-go:disabled { filter: saturate(0.5) brightness(0.86); opacity: 0.85; cursor: default; }
+
+/* ── player cards ─────────────────────────────────────────────────────────── */
+/* The two cards from the handover: same shape, same outline weight, same three
+   panels — only the colour of the offset differs (magenta for you, lime for the
+   opponent), which is why they are two files rather than one mirrored image.
+   The three white panels are measured, not guessed: `kartenfelder.json` puts
+   them at 3.39 %, 31.81 % and 60.38 % of the card height. */
+
+.neo-card {
+  position: absolute;
+  container-type: inline-size;
+  width: 11.4cqw;
+  aspect-ratio: 514 / 679;
+  top: 3.2cqw;
+  background: url("/assets/neo/karte-du.png") center / 100% 100% no-repeat;
+  color: var(--ink);
+}
+.neo-card.foe { background-image: url("/assets/neo/karte-foe.png"); }
+.neo-card.you { left: 1.2cqw; }
+.neo-card.foe { right: 1.2cqw; }
+/* on roll: the card lifts and its own accent doubles up behind it */
+.neo-card.on { filter: drop-shadow(0.3cqw 0.34cqw 0 rgba(13, 10, 24, 0.5)); }
+.neo-card.on::before {
+  content: "ON ROLL";
+  position: absolute;
+  top: -6cqw;
+  left: 2cqw;
+  z-index: 2;
+  padding: 1.2cqw 3.4cqw 1.5cqw;
+  background: var(--hot);
+  color: var(--paper);
+  border: 1.6cqw solid var(--ink);
+  font: 900 4.2cqw var(--jp);
+  letter-spacing: 0.2em;
+  transform: rotate(-3deg);
+}
+.neo-card.foe.on::before { background: #8bd41f; color: var(--ink); }
+
+/* the three measured panels */
+.neo-card .band {
+  position: absolute;
+  left: 7.98%;
+  width: 86.38%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 3.4cqw;
+}
+.neo-card .b1 { top: 3.39%; height: 27.54%; }
+.neo-card .b2 { top: 31.81%; height: 27.84%; justify-content: space-between; padding-top: 2.4cqw; padding-bottom: 2.6cqw; }
+.neo-card .b3 { top: 60.38%; height: 22.39%; justify-content: center; gap: 0.5cqw; }
+
+.neo-card .nm {
+  display: flex;
+  align-items: center;
+  gap: 2cqw;
+  font: 800 italic 10.4cqw var(--jp);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.neo-card .nm .d {
+  width: 8.4cqw;
+  height: 8.4cqw;
+  border-radius: 50%;
+  flex: none;
+  box-sizing: border-box;
+  border: 1.5cqw solid var(--ink);
+  background: var(--hot);
+}
+.neo-card.foe .nm .d { background: #d6e965; }
+.neo-card .sub {
+  font: 600 5cqw var(--jp);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a8792;
+  margin-top: 0.8cqw;
+}
+
+.neo-card .row { display: flex; align-items: baseline; }
+.neo-card .big { font: 800 18.6cqw/1 var(--num); letter-spacing: -0.02em; }
+.neo-card .u { font: 600 5.9cqw var(--jp); font-style: normal; color: #8a8792; margin-left: 1.4cqw; }
+.neo-card .bar { display: flex; gap: 0.5cqw; margin-top: 2cqw; }
+.neo-card .bar i { flex: 1; height: 2.4cqw; background: #d9d6e0; }
+.neo-card .bar i.on { background: var(--ink); }
+
+.neo-card .ft {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 2.4cqw;
+  font: 700 5.7cqw var(--num);
+  line-height: 1.18;
+}
+.neo-card .ft span { color: #8a8792; letter-spacing: 0.14em; text-transform: uppercase; }
+.neo-card .ft b { text-align: right; }
+
+.neo-cube-chip {
+  position: absolute;
+  left: 50%;
+  bottom: -3.4cqw;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #8bd41f;
+  color: var(--ink);
+  border: 1.4cqw solid var(--ink);
+  border-radius: 1.4cqw;
+  padding: 0.9cqw 2.4cqw;
+  font: 800 4.4cqw var(--jp);
+  letter-spacing: 0.08em;
+}
+.neo-cube-chip b { font: 800 5cqw var(--num); margin-left: 1cqw; }
+
+/* ── the pot, above the board ─────────────────────────────────────────────── */
+/* Same build as the player cards — white face, ink outline, hard offset — but the
+   offset is violet, because the pot belongs to neither side. */
+
+.potbar { position: relative; display: flex; align-items: center; justify-content: center; gap: 1.4cqw; }
+.potbar .rail { display: none; }
+.plaque {
+  background: var(--paper);
+  color: var(--ink);
+  border: 0.42cqw solid var(--ink);
+  box-shadow: 0.9cqw 0.9cqw 0 #7b3fe4;
+  padding: 1cqw 2.6cqw 1.2cqw;
+}
+.plaqueIn { display: flex; align-items: baseline; gap: 1.6cqw; }
+.plbl { font: 700 1.15cqw var(--num); letter-spacing: 0.2em; color: #6d6a75; text-transform: uppercase; }
+.plaque .pot { font: 800 3cqw/1 var(--num); display: inline-flex; align-items: center; gap: 0.4cqw; }
+.plaque .pot i { font-style: normal; font-size: 0.62em; color: #7b3fe4; }
+.psub { font: 600 1cqw var(--jp); letter-spacing: 0.06em; color: #6d6a75; }
+.psub b { font: 700 1.1cqw var(--num); color: var(--ink); }
+.cubetag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6cqw;
+  background: #8bd41f;
+  color: var(--ink);
+  border: 0.42cqw solid var(--ink);
+  box-shadow: 0.6cqw 0.6cqw 0 rgba(13, 10, 24, 0.7);
+  padding: 0.7cqw 1.4cqw;
+  font: 800 1.05cqw var(--jp);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cubetag b { font: 800 1.7cqw var(--num); }
+
+/* ── callout ──────────────────────────────────────────────────────────────── */
+/* Contained, never a full-screen flash: a blowout hides the board at exactly
+   the moment you want to see what just happened to it. */
+
+/* Sits under the plaque and over the table, so the first click anywhere dismisses
+   the message rather than landing on a checker. */
+.neo-beatcatch {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  cursor: pointer;
+}
+
+/* ── the callout ──────────────────────────────────────────────────────────────
+   A wide angular plaque with a hard offset slab behind it and three speed lines
+   cutting across, drawn from the Higgsfield sheet generated against the board and
+   background art. It is sized to the word inside it and sits low, under the board
+   centre, so the position stays readable while it is up. The version it replaces
+   was a quarter-screen sunburst poster holding two words. */
+
+.neo-callout {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1.5cqw 5.6cqw;
+  /* A bound the flex line can actually wrap against. Without it the plaque sizes to
+     max-content, `flex-basis: 100%` resolves to that same content width, and the note
+     sits BESIDE the word instead of under it — which is how a two-word badge ended up
+     two thirds as wide as the board. */
+  max-width: 32cqw;
+  /* the same -5.3cqw the board slot carries, so this centres on the BOARD rather
+     than on the stage — the stage is wider than the board by the collecting tray. */
+  /* The whole life of a message in one animation: pop in, overshoot, hold, fade.
+     It used to be a transition from a class applied at mount, which never had a frame
+     at the start state to transition FROM — so the plaque simply appeared and, three
+     seconds later, simply vanished. */
+  transform: translate(calc(-50% - 5.3cqw), -50%) rotate(-3deg);
+  filter: drop-shadow(0 0.5cqw 0.9cqw rgb(0 0 0 / 0.45));
+  cursor: pointer;
+  animation: neo-beat 3s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+@keyframes neo-beat {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% - 5.3cqw), calc(-50% + 1.6cqw)) scale(0.7) rotate(-3deg);
+  }
+  7% {
+    opacity: 1;
+    transform: translate(calc(-50% - 5.3cqw), -50%) scale(1.06) rotate(-3deg);
+  }
+  12% {
+    transform: translate(calc(-50% - 5.3cqw), -50%) scale(1) rotate(-3deg);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(calc(-50% - 5.3cqw), -50%) scale(1) rotate(-3deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% - 5.3cqw), calc(-50% - 1.2cqw)) scale(0.97) rotate(-3deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .neo-callout { animation: neo-beat-fade 3s linear forwards; }
+  @keyframes neo-beat-fade {
+    0%, 80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+}
+
+/* the cut-corner plate and, behind it, the violet slab it casts */
+.neo-callout .plate,
+.neo-callout .slab {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
+  border: 0.22cqw solid var(--ink);
+}
+.neo-callout .plate { background: var(--paper); }
+.neo-callout.hot .plate { background: var(--hot); }
+.neo-callout.good .plate { background: var(--lime); }
+.neo-callout .slab {
+  background: var(--violet);
+  transform: translate(0.85cqw, 0.85cqw);
+  border-color: transparent;
+}
+
+/* three lines raking across the plate, clipped to it */
+.neo-callout .speed {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
+  opacity: 0.5;
+}
+.neo-callout .speed i {
+  position: absolute;
+  top: -20%;
+  height: 140%;
+  width: 0.3cqw;
+  background: var(--ink);
+  transform: skewX(-14deg);
+}
+.neo-callout .speed i:nth-child(1) { left: 12%; }
+.neo-callout .speed i:nth-child(2) { left: 17%; width: 0.15cqw; }
+.neo-callout .speed i:nth-child(3) { right: 13%; }
+
+.neo-callout .body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.8cqw;
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* the WHY line — only the beats a player cannot read off the board carry one, and it
+   stays a whisper next to the word so the plaque does not turn back into a poster */
+.neo-callout .note {
+  flex-basis: 100%;
+  margin-top: 0.35cqw;
+  font: 400 1.15cqw/1.3 var(--ui);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  opacity: 0.78;
+  white-space: normal;
+  /* 26cqw read as "a quarter of the screen", but the stage is far wider than the
+     board — that let the plaque grow to 83% of the board and undo the whole point of
+     shrinking it. Measured against the board instead. */
+  max-width: 20cqw;
+}
+.neo-callout.hot .body { color: var(--paper); }
+.neo-callout .big { font: 700 3.2cqw/1 var(--num); letter-spacing: -0.04em; }
+.neo-callout .word {
+  font: 900 2cqw/1 var(--jp);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  transform: skewX(-8deg);
+}
+
+/* ── moments: the screens either side of a game ───────────────────────────── */
+
+.neo-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 3cqw;
+  background: rgba(13, 10, 24, 0.86);
+}
+.neo-sheet { width: min(70cqw, 100%); text-align: center; }
+.neo-eyebrow { font: 700 0.9cqw var(--jp); letter-spacing: 0.5em; text-transform: uppercase; color: var(--lime); }
+.neo-title {
+  font: 900 5cqw/0.95 var(--jp);
+  text-transform: uppercase;
+  transform: skewX(-8deg);
+  margin-top: 1cqw;
+  text-shadow: 0.35cqw 0.35cqw 0 var(--hot), 0.7cqw 0.7cqw 0 var(--ink);
+}
+.neo-score { display: flex; justify-content: center; align-items: flex-end; gap: 3cqw; margin-top: 2.4cqw; }
+.neo-score .side { display: flex; flex-direction: column; align-items: center; gap: 0.7cqw; }
+.neo-score .side b { font: 700 5.6cqw/1 var(--num); }
+.neo-score .side span {
+  font: 900 1.1cqw var(--jp); letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 0.35cqw 0.9cqw; background: var(--paper); color: var(--ink);
+  border: 0.3cqw solid var(--ink); transform: skewX(-8deg); max-width: 22cqw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.neo-score > i { font: 700 3cqw var(--num); font-style: normal; color: var(--lime); padding-bottom: 1cqw; }
+.neo-badges { display: flex; gap: 0.8cqw; justify-content: center; flex-wrap: wrap; margin-top: 1.8cqw; }
+.neo-badge {
+  font: 900 0.95cqw var(--jp);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.5cqw 1.1cqw 0.6cqw;
+  background: var(--hot);
+  color: var(--paper);
+  border: 0.32cqw solid var(--ink);
+  box-shadow: 0.35cqw 0.35cqw 0 var(--ink);
+  transform: rotate(-1.5deg);
+}
+.neo-badge.alt { background: var(--lime); color: var(--ink); transform: rotate(1.5deg); }
+.neo-note { margin-top: 2cqw; font: 500 1.05cqw/1.7 var(--jp); color: #b4a7ce; }
+.neo-note b { color: var(--paper); font-weight: 700; }
+.neo-row { display: flex; gap: 1cqw; justify-content: center; margin-top: 2.4cqw; flex-wrap: wrap; }
+.neo-btn {
+  font: 900 1.35cqw var(--jp); text-transform: uppercase; cursor: pointer;
+  padding: 0.9cqw 2.4cqw; background: var(--lime); color: var(--ink);
+  border: 0.42cqw solid var(--ink); box-shadow: 0.55cqw 0.55cqw 0 var(--ink);
+  transform: skewX(-8deg); transition: transform 0.07s, box-shadow 0.07s;
+}
+.neo-btn span { display: block; transform: skewX(8deg); }
+.neo-btn:active { transform: skewX(-8deg) translate(0.3cqw, 0.3cqw); box-shadow: 0.2cqw 0.2cqw 0 var(--ink); }
+.neo-btn.alt { background: var(--paper); }
+.neo-btn.danger { background: var(--hot); color: var(--paper); }
+
+/* ── the quiet corners ────────────────────────────────────────────────────── */
+
+.neo-brand {
+  position: absolute; left: 2cqw; bottom: 1.8cqw; z-index: 4;
+  padding: 0.45cqw 0.9cqw 0.55cqw; background: var(--ink); color: var(--paper);
+  border: 0.3cqw solid var(--paper); font-family: var(--badge); font-size: 1.05cqw;
+  transform: rotate(-2deg);
+}
+.neo-brand em { font-style: normal; color: var(--lime); }
+.neo-tools { position: absolute; right: 2cqw; bottom: 1.8cqw; z-index: 4; display: flex; gap: 0.5cqw; }
+.neo-tools button {
+  font: 900 0.8cqw var(--jp); letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+  padding: 0.5cqw 0.95cqw; background: var(--paper); color: var(--ink);
+  border: 0.3cqw solid var(--ink); box-shadow: 0.3cqw 0.3cqw 0 var(--ink);
+}
+.neo-tools button:active { transform: translate(0.2cqw, 0.2cqw); box-shadow: none; }
+.neo-tools button.off { opacity: 0.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .neo *,
+  .neo::after { animation: none !important; transition: none !important; }
+}
+
+/* ── before the board: create a table, then wait for a player ────────────────
+   Two screens, and deliberately no third: the host owns matchmaking, so there is
+   nothing here to search or filter. Built in the handover's card language —
+   white panel, thick ink outline, hard offset shadow, one green main action. */
+
+.neo-page {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 26px 22px 48px;
+  color: var(--paper);
+  overflow-y: auto;
+  max-height: 100%;
+}
+/* The waiting page centres on the stage. `.neo-page` carries a 48px bottom padding
+   for the scrolling pages, which pushed this one 24px above centre — the one place
+   where being off-centre is visible, because there is a single card and nothing else. */
+.neo-page.center {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding-top: 26px;
+  padding-bottom: 26px;
+}
+
+.neo-lkopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 4px 0 18px; }
+.neo-lkopf h2 {
+  margin: 0;
+  font: 800 italic clamp(30px, 5vw, 44px) var(--jp);
+  letter-spacing: -0.03em;
+  text-shadow: 4px 4px 0 var(--ink);
+}
+.neo-lkopf h2 em { color: var(--hot); font-style: inherit; }
+.neo-bal {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 rgba(13, 10, 24, 0.7);
+  padding: 7px 12px;
+  font: 700 11px var(--jp);
+}
+.neo-bal b { font: 700 13px var(--num); display: inline-flex; align-items: center; gap: 3px; }
+
+.neo-cpanel {
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 6px 6px 0 var(--hot);
+  padding: 16px 18px 18px;
+}
+.neo-cpanel h3 { margin: 0 0 14px; font: 800 italic 18px var(--jp); letter-spacing: -0.02em; }
+.neo-cprow { display: flex; flex-wrap: wrap; gap: 16px 26px; align-items: flex-start; }
+.neo-cpg { display: flex; flex-direction: column; }
+.neo-cpg.aus { opacity: 0.38; pointer-events: none; }
+.neo-cplbl {
+  display: block;
+  font: 600 8px var(--jp);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6d6a75;
+  margin-bottom: 6px;
+}
+
+.neo-seg { display: flex; gap: 6px; }
+.neo-seg button {
+  font: 800 italic 11px var(--jp);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: 3px solid var(--ink);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 7px 12px;
+}
+.neo-seg button[aria-pressed="true"] { background: var(--lime); }
+.neo-seg button:active { transform: translate(1px, 1px); }
+
+.neo-stake { display: flex; align-items: center; gap: 6px; }
+.neo-stbtn {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--ink);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 800 16px var(--jp);
+  line-height: 1;
+  cursor: pointer;
+}
+.neo-stbtn:active { transform: translate(1px, 1px); }
+.neo-stwrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 3px solid var(--ink);
+  border-radius: 5px;
+  padding: 4px 10px;
+  background: var(--paper);
+}
+.neo-stwrap input {
+  width: 82px;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: 700 17px var(--num);
+  color: var(--ink);
+  text-align: right;
+}
+.neo-stcur { display: inline-flex; color: var(--hot); }
+.neo-stpre { display: flex; gap: 5px; margin-top: 6px; }
+.neo-stpre button {
+  font: 700 10px var(--num);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.neo-stpre button:hover { background: var(--lime); }
+
+.neo-err { margin-top: 12px; font: 700 11px var(--jp); color: #c2185b; }
+
+.neo-cpfuss {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 3px solid var(--ink);
+}
+.neo-cphint { font: 600 10.5px var(--jp); color: #6d6a75; max-width: 520px; }
+
+/* the one green main action on the screen */
+.neo-cta {
+  flex: none;
+  cursor: pointer;
+  border: 3px solid var(--ink);
+  border-radius: 7px;
+  background: #8bd41f;
+  color: var(--ink);
+  padding: 11px 24px;
+  box-shadow: 5px 5px 0 rgba(13, 10, 24, 0.75);
+}
+.neo-cta span { display: block; text-align: center; font: 800 italic 14px var(--jp); line-height: 1.15; }
+.neo-cta b { font: 800 13px var(--num); font-style: normal; display: inline-flex; align-items: center; gap: 3px; }
+.neo-cta:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 rgba(13, 10, 24, 0.75); }
+.neo-cta:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+.neo-foot { margin: 16px 2px 0; font: 600 10px var(--jp); letter-spacing: 0.06em; color: #b9aed4; }
+
+/* waiting for a player */
+.neo-wait {
+  width: min(560px, 92vw);
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  box-shadow: 9px 9px 0 var(--hot);
+  padding: 24px 28px 22px;
+}
+.neo-wait h2 { margin: 4px 0 14px; font: 800 italic clamp(26px, 4.4vw, 38px) var(--jp); letter-spacing: -0.03em; }
+.neo-wait h2 em { color: var(--hot); font-style: inherit; }
+.neo-eyebrow {
+  font: 600 8.5px var(--jp);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #6d6a75;
+}
+.neo-waitseats { display: flex; align-items: stretch; gap: 14px; }
+.neo-seat {
+  flex: 1;
+  border: 3px solid var(--ink);
+  border-radius: 7px;
+  padding: 13px 14px;
+  text-align: center;
+  background: #f6f4fa;
+}
+.neo-seat.leer { border-style: dashed; opacity: 0.7; }
+.neo-ava {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: var(--hot);
+  color: var(--paper);
+  font: 800 italic 16px var(--jp);
+}
+.neo-seat.foe .neo-ava { background: #29a8dc; }
+.neo-seat.leer .neo-ava { background: #d9d6e0; color: var(--ink); }
+.neo-seatname { margin-top: 7px; font: 800 italic 14px var(--jp); }
+.neo-seatstate {
+  font: 600 9px var(--jp);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6d6a75;
+}
+.neo-waitpot {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 10px;
+  padding: 9px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 5px 5px 0 var(--violet);
+}
+.neo-waitpot span { font: 700 9.5px var(--num); letter-spacing: 0.2em; color: #6d6a75; }
+.neo-waitpot b { font: 800 24px var(--num); display: inline-flex; align-items: center; gap: 4px; }
+.neo-waitpot i { font: 700 10px var(--num); font-style: normal; color: #6d6a75; margin-left: auto; }
+.neo-waittxt { font: 600 12px var(--jp); line-height: 1.6; color: #3d3a44; }
+.neo-waitrow { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+.neo-btn.sm { padding: 6px 10px; font-size: 10px; }
+
+/* Exactly one green main action per screen (handover §3.3). Closing the table is not it — inside a
+   white card the neutral paper button is the correct weight. */
+.neo-wait .neo-btn,
+.neo-lkopf .neo-btn {
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 5px;
+  box-shadow: 3px 3px 0 rgba(13, 10, 24, 0.7);
+  padding: 9px 15px;
+  font: 800 11px var(--jp);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.neo-wait .neo-btn:hover, .neo-lkopf .neo-btn:hover { background: var(--lime); }
+.neo-wait .neo-btn:active, .neo-lkopf .neo-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(13, 10, 24, 0.7); }
+.neo-wait .neo-btn > span, .neo-lkopf .neo-btn > span { all: unset; }
+
+/* the measured point silhouettes for legal landings — under the checkers, over the plate */
+.nb-marks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+
+/* ── the collecting tray ──────────────────────────────────────────────────────
+   Sits beside the plate, flush with it top and bottom. The board keeps its own
+   width so none of its percentage maths moves; the tray hangs off the end.
+   Widths come from the art: the schale is 322x1286, i.e. 0.2504 of the board's
+   HEIGHT — which on a 1.4906 plate is 16.8 % of its width. */
+
+.neo-boardrow { position: relative; width: 100%; }
+.neo-fach {
+  position: absolute;
+  left: 100%;
+  margin-left: 1.5cqw;
+  bottom: 0;
+  width: 16.8cqw;
+  aspect-ratio: 322 / 1286;
+}
+.neo-schale { width: 100%; height: 100%; display: block; filter: drop-shadow(0.5cqw 0.6cqw 0 rgba(13, 10, 24, 0.55)); }
+
+/* the two openings, measured off the drawn tray */
+.neo-mulde { position: absolute; overflow: hidden; container-type: size; }
+.neo-mulde.oben { left: 20.19%; right: 20.5%; top: 4.67%; height: 41.52%; }
+.neo-mulde.unten { left: 20.19%; right: 20.81%; top: 53.81%; height: 41.37%; }
+.neo-mulde.ziel { cursor: pointer; box-shadow: inset 0 0 0 0.7cqw #6a2bff; }
+
+/* A borne-off checker seen edge-on: what you see from the side IS its coloured rim. */
+.neo-kante {
+  position: absolute;
+  left: 50%;
+  width: 88%;
+  border: 0.14cqw solid var(--ink);
+  border-radius: 30% / 46%;
+  background: var(--kr);
+  box-sizing: border-box;
+}
+.neo-kante.w { --kr: #fa1194; --kd: #a50a60; }
+.neo-kante.b { --kr: #29a8dc; --kd: #14648a; }
+.neo-kante::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38%;
+  background: var(--kd);
+  border-radius: 0 0 28% 28% / 0 0 64% 64%;
+}
+.neo-kante::before {
+  content: "";
+  position: absolute;
+  left: 14%;
+  top: 14%;
+  width: 26%;
+  height: 24%;
+  border-radius: 50%;
+  background: rgba(251, 251, 243, 0.65);
+}
+
+.neo-fachtext {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  font: 700 1cqw var(--num);
+  letter-spacing: 0.16em;
+  color: #a294c4;
+  text-shadow: 0 1px 0 var(--ink);
+}
+.neo-fachtext.o { top: 1.1%; }
+.neo-fachtext.u { bottom: 1.1%; }
+
+/* the board+tray group is what is centred, so the plate sits a little left of the middle */
+.neo-slot { transform: translate(calc(-50% - 5.3cqw), -50%); }
+
+/* ── in-game moments, as the handover's cards ─────────────────────────────────
+   A decision that costs money is not a poster. The overlays that ask something of
+   the player are white cards with a thick ink outline and a hard coloured offset —
+   the same build as the player cards and the pot, so the screen stays one object.
+   Magenta offset by default, lime when the news is good. */
+
+.neo-sheet.card {
+  width: min(44cqw, 100%);
+  text-align: left;
+  background: var(--paper);
+  color: var(--ink);
+  border: 0.42cqw solid var(--ink);
+  border-radius: 0.9cqw;
+  box-shadow: 1.2cqw 1.2cqw 0 var(--hot);
+  padding: 2.6cqw 3cqw 2.4cqw;
+}
+.neo-sheet.card.gut { box-shadow: 1.2cqw 1.2cqw 0 #d6e965; }
+.neo-sheet.card .neo-eyebrow {
+  font: 600 0.85cqw var(--jp);
+  letter-spacing: 0.2em;
+  color: #6d6a75;
+}
+.neo-sheet.card .neo-title {
+  font: 800 italic 3.4cqw/1 var(--jp);
+  letter-spacing: -0.03em;
+  text-transform: none;
+  transform: none;
+  text-shadow: none;
+  color: var(--ink);
+  margin: 0.5cqw 0 1.2cqw;
+}
+.neo-sheet.card .neo-title em { color: var(--hot); font-style: inherit; }
+.neo-sheet.card .neo-note { color: #3d3a44; font: 600 1.1cqw/1.65 var(--jp); margin-top: 0; }
+.neo-sheet.card .neo-note b { color: var(--ink); }
+.neo-sheet.card .neo-row { justify-content: flex-end; margin-top: 1.8cqw; }
+
+/* the match score, as two outlined plates */
+.neo-sheet.card .neo-score { gap: 1.4cqw; margin: 1.4cqw 0 1cqw; align-items: stretch; }
+.neo-sheet.card .neo-score .side {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border: 0.42cqw solid var(--ink);
+  border-radius: 0.7cqw;
+  background: #f6f4fa;
+  padding: 0.9cqw 1.4cqw;
+}
+.neo-sheet.card .neo-score .side b { font: 800 2.6cqw/1 var(--num); }
+.neo-sheet.card .neo-score .side span { font: 800 italic 1.2cqw var(--jp); }
+.neo-sheet.card .neo-score i { align-self: center; font: 800 italic 1.9cqw var(--jp); color: var(--hot); }
+.neo-sheet.card .neo-badge {
+  display: inline-block;
+  background: #d6e965;
+  border: 0.42cqw solid var(--ink);
+  border-radius: 0.5cqw;
+  padding: 0.4cqw 1cqw;
+  font: 800 italic 1.05cqw var(--jp);
+  color: var(--ink);
+}
+.neo-sheet.card .neo-badges { margin: 0 0 1cqw; }
+
+/* buttons inside a card: paper by default, green for the one main action */
+.neo-sheet.card .neo-btn {
+  transform: none;
+  border-radius: 0.5cqw;
+  background: #8bd41f;
+  color: var(--ink);
+  border: 0.42cqw solid var(--ink);
+  box-shadow: 0.45cqw 0.45cqw 0 rgba(13, 10, 24, 0.75);
+  padding: 1cqw 1.8cqw;
+  font: 800 italic 1.15cqw var(--jp);
+}
+.neo-sheet.card .neo-btn span { transform: none; }
+.neo-sheet.card .neo-btn.alt { background: var(--paper); }
+.neo-sheet.card .neo-btn.danger { background: var(--hot); color: var(--paper); }
+.neo-sheet.card .neo-btn:active { transform: translate(0.25cqw, 0.25cqw); box-shadow: 0.2cqw 0.2cqw 0 rgba(13, 10, 24, 0.75); }
+
+/* ── the type system, applied ─────────────────────────────────────────────────
+   Display for what the game SAYS, ui for what it LABELS, num for what it COUNTS.
+   Dela Gothic One has one weight and no italic, so every "800 italic" the old
+   sheets asked for is dropped here rather than faked by the browser. */
+
+.neo,
+.neo-page,
+.neo-wait { font-family: var(--ui); }
+
+/* every figure in the game, always tabular so a ticking number cannot nudge the
+   layout it sits in */
+.num,
+.mono,
+.neo-card .big,
+.neo-card .ft,
+.plaque .pot,
+.psub b,
+.neo-bal b,
+.neo-waitpot b,
+.neo-tok,
+.neo-score .side b {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-style: normal;
+}
+
+/* the game's voice */
+.neo-title,
+.neo-sheet.card .neo-title,
+.neo-lkopf h2,
+.neo-wait h2,
+.neo-cpanel h3,
+.neo-card .nm,
+.neo-go,
+.neo-cta span,
+.neo-btn,
+.neo-badge,
+.neo-seat .neo-seatname,
+.neo-ava,
+.plbl {
+  font-family: var(--display);
+  font-style: normal;
+  /* the kit decides: single-cut faces stay at 400, faces with a real axis go heavier */
+  font-weight: var(--display-weight, 400);
+  letter-spacing: var(--display-track, -0.01em);
+}
+/* Dela is already heavy — the old faux-italic skew reads as a filter on top of it */
+.neo-title,
+.neo-sheet.card .neo-title,
+.neo-lkopf h2,
+.neo-wait h2 { transform: none; }
+
+/* labels stay in the quiet face and earn their place with tracking, not weight */
+.neo-eyebrow,
+.neo-cplbl,
+.neo-card .sub,
+.neo-card .ft span,
+.neo-fachtext,
+.neo-seatstate,
+.psub,
+.neo-cphint,
+.neo-foot,
+.neo-note {
+  font-family: var(--ui);
+  font-style: normal;
+}
+
+
+/* ── the first-board explainer ────────────────────────────────────────────── */
+.neo-veil.intro { z-index: 45; }
+.intro-card { position: relative; width: min(52cqw, 100%); max-height: 88%; overflow: auto; }
+.intro-x {
+  position: absolute; top: 1.1cqw; right: 1.1cqw; z-index: 2; cursor: pointer;
+  width: 2.6cqw; height: 2.6cqw; display: grid; place-items: center;
+  background: var(--paper); color: var(--ink);
+  border: 0.32cqw solid var(--ink); border-radius: 0.4cqw;
+  box-shadow: 0.3cqw 0.3cqw 0 rgba(13, 10, 24, 0.7); font: 400 1.1cqw var(--ui); line-height: 1;
+}
+.intro-x:hover { background: var(--hot); color: var(--paper); }
+.intro-x:active { transform: translate(0.15cqw, 0.15cqw); box-shadow: 0.15cqw 0.15cqw 0 rgba(13, 10, 24, 0.7); }
+.intro-list { margin: 1.2cqw 0 0; padding-left: 1.6cqw; display: flex; flex-direction: column; gap: 0.9cqw; }
+.intro-list li { font: 400 1.05cqw/1.6 var(--ui); color: #3d3a44; }
+.intro-list li b { color: var(--ink); }
+.intro-list li::marker { color: var(--hot); font-family: var(--num); }
+.intro-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.2cqw;
+  margin-top: 1.6cqw; padding-top: 1.2cqw; border-top: 0.32cqw solid var(--ink);
+}
+.intro-hint { font: 400 0.95cqw var(--ui); color: #6d6a75; }
+
+/* ── sound control ────────────────────────────────────────────────────────── */
+.snd-anchor { position: relative; display: inline-flex; }
+.snd-pop {
+  position: absolute; right: 0; bottom: calc(100% + 0.8cqw); z-index: 60; width: 20cqw; min-width: 210px;
+  background: var(--paper); color: var(--ink);
+  border: 0.32cqw solid var(--ink); border-radius: 0.6cqw;
+  box-shadow: 0.6cqw 0.6cqw 0 rgba(13, 10, 24, 0.75);
+  padding: 1cqw 1.2cqw 1.1cqw;
+}
+.snd-head { font: 400 0.9cqw var(--ui); letter-spacing: 0.2em; text-transform: uppercase; color: #6d6a75; margin-bottom: 0.7cqw; }
+.snd-row { display: grid; grid-template-columns: 4.6cqw 1fr 2.2cqw; align-items: center; gap: 0.7cqw; margin-bottom: 0.6cqw; cursor: pointer; }
+.snd-label { font: 400 0.95cqw var(--ui); color: var(--ink); }
+.snd-val { font: 400 0.95cqw var(--num); text-align: right; color: #6d6a75; font-variant-numeric: tabular-nums; }
+.snd-range {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 0.7cqw; cursor: pointer; outline: none;
+  border: 0.22cqw solid var(--ink); border-radius: 99px;
+  background: linear-gradient(90deg, var(--hot) 0 var(--fill, 80%), #e6e3ee var(--fill, 80%) 100%);
+}
+.snd-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 1.5cqw; height: 1.5cqw; border-radius: 50%;
+  background: var(--lime); border: 0.28cqw solid var(--ink); cursor: pointer;
+}
+.snd-range::-moz-range-thumb {
+  width: 1.5cqw; height: 1.5cqw; border-radius: 50%;
+  background: var(--lime); border: 0.28cqw solid var(--ink); cursor: pointer;
+}
+.snd-foot { display: flex; gap: 0.6cqw; margin-top: 0.9cqw; }
+.snd-mute, .snd-done {
+  flex: 1; cursor: pointer; font: 400 0.95cqw var(--ui); padding: 0.6cqw 0.4cqw;
+  border: 0.28cqw solid var(--ink); border-radius: 0.4cqw; background: var(--paper); color: var(--ink);
+  box-shadow: 0.25cqw 0.25cqw 0 rgba(13, 10, 24, 0.7);
+}
+.snd-mute.on { background: var(--hot); color: var(--paper); }
+.snd-done { background: #8bd41f; }
+.snd-mute:active, .snd-done:active { transform: translate(0.12cqw, 0.12cqw); box-shadow: 0.12cqw 0.12cqw 0 rgba(13, 10, 24, 0.7); }
+
+/* In the lobby the button sits near the top, so the panel drops DOWN from it
+   instead of off the top of the page. */
+.neo-lkopf .snd-pop { bottom: auto; top: calc(100% + 8px); width: 250px; padding: 12px 14px 13px; }
+.neo-lkopf .snd-head { font-size: 8px; margin-bottom: 8px; }
+.neo-lkopf .snd-row { grid-template-columns: 52px 1fr 26px; gap: 8px; margin-bottom: 8px; }
+.neo-lkopf .snd-label, .neo-lkopf .snd-val { font-size: 11px; }
+.neo-lkopf .snd-range { height: 8px; border-width: 2px; }
+.neo-lkopf .snd-range::-webkit-slider-thumb { width: 16px; height: 16px; border-width: 3px; }
+.neo-lkopf .snd-range::-moz-range-thumb { width: 16px; height: 16px; border-width: 3px; }
+.neo-lkopf .snd-foot { gap: 8px; margin-top: 10px; }
+.neo-lkopf .snd-mute, .neo-lkopf .snd-done { font-size: 11px; padding: 7px 4px; border-width: 3px; border-radius: 5px; box-shadow: 3px 3px 0 rgba(13, 10, 24, 0.7); }
+
+/* A die being thrown: it rattles where it lies. The shake is deliberately tight
+   and fast — a die that swings widely reads as floating rather than landing. */
+.nb-die.rolling {
+  animation: neo-rattle 0.11s linear infinite;
+  animation-delay: var(--rdelay, 0ms);
+  z-index: 42;
+}
+@keyframes neo-rattle {
+  0%   { transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) - 9deg)) translate(-3%, 2%); }
+  25%  { transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) + 11deg)) translate(3%, -3%); }
+  50%  { transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) - 6deg)) translate(2%, 3%); }
+  75%  { transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) + 7deg)) translate(-2%, -2%); }
+  100% { transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) - 9deg)) translate(-3%, 2%); }
+}
+/* it settles with a single small bounce, not a fade */
+.nb-die { animation: neo-settle 0.22s cubic-bezier(0.2, 1.5, 0.35, 1); }
+@keyframes neo-settle {
+  from { transform: translate(-50%, -50%) rotate(var(--r, 0deg)) scale(1.22); }
+  to   { transform: translate(-50%, -50%) rotate(var(--r, 0deg)) scale(1); }
+}
+
+/* ── the rules sheet and the end screen ───────────────────────────────────────
+   Both used to hang off theme.css, the stylesheet from before the handover, so
+   they were the two places where the game stopped looking like itself: a grey
+   rounded card with yellow number bubbles, sitting off-centre. They are Neo cards
+   now, on the same paper, ink and hatch as everything else. */
+
+.neo-veil.rules { z-index: 46; }
+.rules-card { position: relative; width: min(56cqw, 100%); max-height: 88%; overflow: auto; text-align: left; }
+.rules-list {
+  margin: 1.3cqw 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1cqw;
+}
+.rules-item { display: grid; grid-template-columns: 2.2cqw 1fr; gap: 0.9cqw; align-items: start; }
+.rules-num {
+  display: grid;
+  place-items: center;
+  width: 2.2cqw;
+  height: 2.2cqw;
+  background: var(--hot);
+  color: var(--paper);
+  border: 0.2cqw solid var(--ink);
+  box-shadow: 0.22cqw 0.22cqw 0 var(--ink);
+  font: 700 1.05cqw/1 var(--num);
+}
+.rules-body { display: flex; flex-direction: column; gap: 0.25cqw; }
+.rules-item-title { font: 700 1.15cqw var(--ui); color: var(--ink); }
+.rules-item-desc { font: 400 1.02cqw/1.6 var(--ui); color: #3d3a44; }
+
+.result-card { position: relative; width: min(46cqw, 100%); text-align: center; }
+.result-title {
+  margin: 0.3cqw 0 0.2cqw;
+  font: 900 italic 5.2cqw/1 var(--display);
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  text-shadow: 0.45cqw 0.45cqw 0 var(--ink);
+}
+.result-title.win { color: var(--lime); }
+.result-title.lose { color: var(--hot); }
+.result-title.draw { color: var(--violet); }
+.result-board { margin-top: 1.4cqw; display: flex; flex-direction: column; gap: 0.5cqw; }
+.result-row {
+  display: grid;
+  grid-template-columns: 1.1cqw 1fr auto;
+  gap: 0.8cqw;
+  align-items: center;
+  padding: 0.65cqw 0.9cqw;
+  background: rgba(13, 10, 24, 0.05);
+  border: 0.16cqw solid var(--ink);
+  font: 400 1.05cqw var(--ui);
+  color: var(--ink);
+}
+.result-row.you { background: var(--lime); }
+.result-swatch { width: 1.1cqw; height: 1.1cqw; border: 0.16cqw solid var(--ink); }
+.result-name { text-align: left; }
+.result-share { font-variant-numeric: tabular-nums; font-weight: 700; }
+.result-net {
+  margin-top: 1cqw;
+  font: 700 2.2cqw/1 var(--num);
+  font-variant-numeric: tabular-nums;
+}
+.result-net.up { color: #2f8f3d; }
+.result-net.down { color: var(--hot); }
+.result-actions {
+  margin-top: 1.6cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7cqw;
+  align-items: stretch;
+}
+
+/* The card title is sized for two or three words; this one is five and was wrapping
+   to three lines, eating the space the rules need. */
+.rules-card .neo-title { font-size: 2.6cqw; line-height: 1.05; }
+.rules-card { width: min(62cqw, 100%); }
+
+/* The kit's button carries a decorative absolutely-positioned layer that only makes
+   sense for a single, standalone call to action. Stacked in a column the second one
+   pulled out of flow and landed on top of the first. */
+.result-actions .neo-btn { position: relative; }
+.result-row { min-width: 0; }
+.result-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-share { display: inline-flex; align-items: center; gap: 0.35cqw; white-space: nowrap; }
+/* The kit's button face is drawn for one or two short words; this label is four, and
+   it wrapped to three lines inside a fixed face. */
+.result-actions .neo-btn > span { white-space: nowrap; }

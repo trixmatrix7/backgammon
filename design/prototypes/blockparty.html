@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLOCK PARTY — art direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   BLOCK PARTY — the friendly one
+   --------------------------------------------------------------------------
+   Construction rule: EVERYTHING HAS THICKNESS AND WEIGHT. Every element sits
+   on a solid colour "side" underneath it, the way a physical button does, and
+   pressing it actually squashes that side down. Nothing is flat and nothing is
+   sharp — the smallest radius on the screen is 14px.
+
+   Motion carries the whole personality: squash and stretch on everything. This
+   is the direction that makes a betting game feel like a toy rather than a
+   terminal, which is either exactly right or exactly wrong — worth having in
+   the set so the call can actually be made.
+   ========================================================================== */
+:root{
+  --sand:#fff3e2; --cream:#ffffff; --deep:#35304a; --soft:#8b8299;
+  --mint:#3fd39b; --coral:#ff7a6b; --sun:#ffc94d; --sky:#5aa9ff;
+  --ui:"Baloo 2", system-ui, sans-serif;
+  --alt:"Nunito", system-ui, sans-serif;
+  --num:"JetBrains Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box; margin:0}
+body{background:#efe3d2; color:var(--deep); font-family:var(--ui); -webkit-font-smoothing:antialiased}
+.num{font-family:var(--num); font-variant-numeric:tabular-nums}
+[hidden]{display:none !important}
+
+.wrap{max-width:1500px; margin:0 auto; padding:30px 22px 70px}
+.head{display:flex; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:18px}
+.head h1{font:800 clamp(34px,5.4vw,58px)/1 var(--ui); letter-spacing:-.01em; color:var(--deep)}
+.head h1 em{font-style:normal; color:var(--coral)}
+.head .jp{font:800 12px var(--alt); letter-spacing:.4em; text-transform:uppercase; color:var(--mint); margin-bottom:8px}
+.head p{flex:1 1 320px; font:600 13px/1.8 var(--alt); color:#6f6784; max-width:60ch}
+.head p b{color:var(--deep); font-weight:800}
+
+.nav{display:flex; gap:8px; margin:0 0 16px}
+.nav button{font:700 13px var(--ui); cursor:pointer; padding:9px 20px 11px; border:0; border-radius:99px;
+  background:var(--cream); color:var(--soft); box-shadow:0 3px 0 #ddd2c2}
+.nav button[aria-current="true"]{background:var(--coral); color:#fff; box-shadow:0 3px 0 #d95a4c}
+
+/* ==========================================================================
+   STAGE
+   ========================================================================== */
+.stage{
+  position:relative; aspect-ratio:16/9; overflow:hidden; container-type:inline-size;
+  border-radius:2cqw; background:radial-gradient(90% 80% at 50% 20%, #fff8ee, #f4e3cd 70%, #e9d5ba);
+  box-shadow:0 1.4cqw 0 #d9c5a8, 0 3cqw 5cqw rgba(90,70,50,.28);
+}
+.stage > *{z-index:2}
+/* soft blobs, the only decoration */
+.stage::before{content:""; position:absolute; left:-8cqw; top:-10cqw; width:34cqw; aspect-ratio:1;
+  border-radius:50%; background:rgba(90,169,255,.14); z-index:1}
+.stage::after{content:""; position:absolute; right:-6cqw; bottom:-12cqw; width:30cqw; aspect-ratio:1;
+  border-radius:50%; background:rgba(63,211,155,.16); z-index:1}
+
+/* ── board ────────────────────────────────────────────────────────────────── */
+.slot{position:absolute; left:50%; top:53%; transform:translate(-50%,-50%); width:53cqw; container-type:inline-size}
+.board{position:relative; line-height:0; border-radius:1.4cqw; overflow:hidden;
+  box-shadow:0 1cqw 0 rgba(120,95,70,.3), 0 2cqw 3cqw rgba(90,70,50,.25)}
+.board > img{display:block; width:100%; height:auto}
+.play{position:absolute; inset:0}
+
+/* fat pucks with a real side — the thickness IS the design */
+.chk{
+  position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  background:var(--fill); box-shadow:0 .62cqw 0 var(--side), 0 .9cqw 1cqw rgba(90,70,50,.3);
+  transition:top .26s cubic-bezier(.34,1.8,.5,1);
+}
+.chk::before{content:""; position:absolute; inset:26%; border-radius:50%; background:var(--dot)}
+.chk.w{--fill:#ffffff; --side:#d9cfe0; --dot:rgba(53,48,74,.1)}
+.chk.b{--fill:var(--deep); --side:#221e33; --dot:rgba(255,255,255,.14)}
+.chk.can{animation:hop 1.4s ease-in-out infinite}
+@keyframes hop{
+  0%,100%{transform:translate(-50%,-50%) scale(1,1)}
+  40%{transform:translate(-50%,calc(-50% - .7cqw)) scale(.94,1.07)}
+  70%{transform:translate(-50%,-50%) scale(1.06,.94)}
+}
+.chk.sel{box-shadow:0 .62cqw 0 var(--side), 0 0 0 .35cqw var(--sun), 0 .9cqw 1cqw rgba(90,70,50,.3)}
+.spot{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  background:rgba(255,201,77,.42); box-shadow:inset 0 0 0 .22cqw var(--sun); animation:throb 1.3s ease-in-out infinite}
+@keyframes throb{50%{transform:translate(-50%,-50%) scale(1.16)}}
+
+.die{position:absolute; transform:translate(-50%,-50%) rotate(var(--r,0deg)); aspect-ratio:1;
+  border-radius:26%; background:#fff; box-shadow:0 .5cqw 0 #ded3c2, 0 .8cqw .9cqw rgba(90,70,50,.28)}
+.die i{position:absolute; width:19%; aspect-ratio:1; border-radius:50%; background:var(--coral); transform:translate(-50%,-50%)}
+.die.spent{filter:saturate(.25) brightness(.94)}
+.cube{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; display:grid; place-items:center;
+  border-radius:26%; background:var(--sun); color:var(--deep); font:800 2cqw var(--ui);
+  box-shadow:0 .5cqw 0 #d8a52f, 0 .8cqw .9cqw rgba(90,70,50,.26)}
+
+/* ── callout: a soft blob that bounces in ─────────────────────────────────── */
+.callout{position:absolute; left:50%; top:40%; z-index:20; pointer-events:none;
+  width:24cqw; aspect-ratio:1.15; display:grid; place-items:center;
+  transform:translate(-50%,-50%) scale(.3); opacity:0}
+.callout.in{opacity:1; transform:translate(-50%,-50%) scale(1);
+  transition:transform .4s cubic-bezier(.2,2.1,.4,1), opacity .12s}
+.callout.out{opacity:0; transform:translate(-50%,-50%) scale(.86); transition:all .28s ease-in}
+.co-burst{position:absolute; inset:0; background:var(--cream);
+  border-radius:46% 54% 52% 48% / 56% 44% 56% 44%;
+  box-shadow:0 1cqw 0 #e3d8ea, 0 2cqw 3cqw rgba(90,70,50,.28)}
+.callout.hot .co-burst{background:var(--coral); box-shadow:0 1cqw 0 #d95a4c, 0 2cqw 3cqw rgba(90,70,50,.28)}
+.callout.good .co-burst{background:var(--mint); box-shadow:0 1cqw 0 #2fae7f, 0 2cqw 3cqw rgba(90,70,50,.28)}
+.co-body{position:relative; z-index:1; text-align:center}
+.callout.hot .co-body, .callout.good .co-body{color:#fff}
+.co-big{display:flex; justify-content:center; gap:.7cqw; font:800 3cqw/1 var(--ui)}
+.co-word{display:block; margin-top:.5cqw; font:800 1.2cqw var(--ui); letter-spacing:.04em}
+.co-face{position:relative; width:3.4cqw; aspect-ratio:1; border-radius:26%; display:inline-block;
+  background:#fff; box-shadow:0 .3cqw 0 #ded3c2}
+.co-face i{position:absolute; width:19%; aspect-ratio:1; border-radius:50%; background:var(--coral); transform:translate(-50%,-50%)}
+
+/* ==========================================================================
+   HUD — pills and pressed buttons
+   ========================================================================== */
+.plr{position:absolute; top:4.6cqw; width:19cqw; padding:1.1cqw 1.2cqw 1.3cqw; border-radius:1.6cqw;
+  background:var(--cream); box-shadow:0 .7cqw 0 #e5d9c8, 0 1.4cqw 2cqw rgba(90,70,50,.18)}
+.plr.you{left:2.4cqw} .plr.foe{right:2.4cqw}
+.plr.on{box-shadow:0 .7cqw 0 var(--coral), 0 1.6cqw 2.4cqw rgba(90,70,50,.24)}
+.plr .top{display:flex; align-items:center; gap:.7cqw}
+.plr .av{width:2.4cqw; aspect-ratio:1; border-radius:50%; display:grid; place-items:center; flex:none;
+  font:800 1.2cqw var(--ui); color:#fff; background:var(--sky)}
+.plr.foe .av{background:var(--mint)}
+.plr .nm{font:800 1.4cqw/1.1 var(--ui)}
+.plr .st{font:700 .7cqw var(--alt); letter-spacing:.14em; text-transform:uppercase; color:var(--soft)}
+.plr .big{font:800 2.8cqw/1 var(--num); margin-top:.7cqw}
+.plr .big small{font:700 .8cqw var(--alt); letter-spacing:.16em; text-transform:uppercase; color:var(--soft); margin-left:.4cqw}
+.plr .dots{display:flex; gap:.14cqw; margin-top:.7cqw}
+.plr .dots i{flex:1; height:.55cqw; border-radius:99px; background:#e9e2f0}
+.plr .dots i.on{background:var(--mint)}
+.plr .r{display:flex; justify-content:space-between; align-items:baseline; margin-top:.55cqw;
+  font:700 .78cqw var(--alt); letter-spacing:.08em; text-transform:uppercase; color:var(--soft)}
+.plr .r b{font:700 1.1cqw var(--num); color:var(--deep)}
+
+.pot{position:absolute; left:50%; top:1.8cqw; transform:translateX(-50%); text-align:center;
+  padding:.6cqw 2cqw .8cqw; border-radius:99px; background:var(--sun); color:var(--deep);
+  box-shadow:0 .55cqw 0 #d8a52f}
+.pot .k{display:block; font:800 .72cqw var(--alt); letter-spacing:.3em; text-transform:uppercase; opacity:.7}
+.pot .v{display:block; font:800 1.9cqw/1 var(--num); margin-top:.1cqw}
+.pot .s{display:block; font:700 .68cqw var(--alt); opacity:.7; margin-top:.2cqw}
+
+.dock{position:absolute; left:50%; bottom:2cqw; transform:translateX(-50%);
+  display:flex; align-items:center; gap:1.2cqw; padding:.7cqw 1cqw; border-radius:99px;
+  background:var(--cream); box-shadow:0 .6cqw 0 #e5d9c8}
+.dock .lbl{font:800 .72cqw var(--alt); letter-spacing:.2em; text-transform:uppercase; color:var(--soft)}
+.toks{display:flex; gap:.4cqw}
+.tok{position:relative; width:2.2cqw; height:2.2cqw; border-radius:28%; background:#f3eee8; box-shadow:0 .22cqw 0 #ddd4c8}
+.tok i{position:absolute; width:19%; aspect-ratio:1; border-radius:50%; background:var(--coral); transform:translate(-50%,-50%)}
+.tok.used{opacity:.35}
+.go{font:800 1.15cqw var(--ui); padding:.75cqw 2.2cqw .9cqw; cursor:pointer; border:0; border-radius:99px;
+  background:var(--mint); color:#fff; box-shadow:0 .55cqw 0 #2fae7f; transition:transform .09s, box-shadow .09s}
+.go:active{transform:translateY(.4cqw); box-shadow:0 .15cqw 0 #2fae7f}
+.go.alt{background:var(--cream); color:var(--soft); box-shadow:0 .55cqw 0 #e5d9c8}
+.mark{position:absolute; left:2.6cqw; bottom:2.4cqw; font:800 1cqw var(--ui); color:var(--soft)}
+.tools{position:absolute; right:2.6cqw; bottom:2.4cqw; display:flex; gap:.6cqw}
+.tools button{font:800 .76cqw var(--alt); letter-spacing:.1em; text-transform:uppercase; cursor:pointer;
+  padding:.5cqw 1cqw .62cqw; border:0; border-radius:99px; background:var(--cream); color:var(--soft); box-shadow:0 .3cqw 0 #e5d9c8}
+
+/* other screens */
+.sheet{position:absolute; inset:0; display:grid; place-items:center; padding:4cqw; z-index:5}
+.sheet .inner{width:min(64cqw,100%); text-align:center}
+.eyebrow{font:800 .82cqw var(--alt); letter-spacing:.34em; text-transform:uppercase; color:var(--soft)}
+.title{font:800 4cqw/1.05 var(--ui); margin-top:.9cqw}
+.title em{font-style:normal; color:var(--coral)}
+.score{display:flex; justify-content:center; align-items:flex-end; gap:3.4cqw; margin-top:2.2cqw}
+.score .side{display:flex; flex-direction:column; align-items:center; gap:.7cqw}
+.score .side b{font:800 5cqw/1 var(--num)}
+.score .side span{font:800 .84cqw var(--alt); letter-spacing:.2em; text-transform:uppercase; color:var(--soft)}
+.score > i{font:800 2.4cqw var(--ui); font-style:normal; color:var(--soft); padding-bottom:1cqw}
+.note{margin-top:1.6cqw; font:600 1cqw/1.85 var(--alt); color:#6f6784}
+.note b{color:var(--deep); font-weight:800}
+.row2{display:flex; gap:1cqw; justify-content:center; margin-top:2.2cqw; flex-wrap:wrap}
+.tables{display:grid; grid-template-columns:repeat(3,1fr); gap:1.2cqw; margin-top:2cqw}
+.tcard{background:var(--cream); border-radius:1.4cqw; padding:1.3cqw; text-align:left; cursor:pointer;
+  box-shadow:0 .6cqw 0 #e5d9c8; transition:transform .12s, box-shadow .12s}
+.tcard:hover{transform:translateY(-.3cqw); box-shadow:0 .95cqw 0 var(--coral)}
+.tcard h4{font:800 1.3cqw var(--ui)}
+.tcard .meta{margin-top:.3cqw; font:700 .72cqw var(--alt); letter-spacing:.1em; text-transform:uppercase; color:var(--soft)}
+.tcard .buy{margin-top:.9cqw; font:800 1.6cqw var(--num); color:var(--mint)}
+
+.tests{display:flex; gap:9px; margin-top:22px; flex-wrap:wrap}
+.tests button{font:800 12.5px var(--ui); cursor:pointer; padding:11px 20px 13px; border:0; border-radius:99px;
+  background:#fff; color:var(--deep); box-shadow:0 3px 0 #ddd2c2}
+.tests button:active{transform:translateY(2px); box-shadow:0 1px 0 #ddd2c2}
+.legend{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:16px; margin-top:24px}
+.legend div{background:#fff; border-radius:14px; padding:13px 15px; box-shadow:0 3px 0 #ddd2c2}
+.legend h4{font:800 12.5px var(--ui)}
+.legend h4 em{font-style:normal; color:var(--coral)}
+.legend p{margin-top:5px; font:600 12.5px/1.65 var(--alt); color:#6f6784}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div><div class="jp">Block Party</div><h1>Block <em>Party</em></h1></div>
+    <p>Construction rule: <b>everything has thickness</b>. Every element sits on a solid colour side
+    underneath it like a real button, and pressing one squashes that side down. Nothing is flat and
+    nothing is sharp. Motion carries the personality — squash and stretch on all of it. Either
+    exactly right for a casual money game or exactly wrong, which is why it is in the set.</p>
+  </header>
+
+  <nav class="nav">
+    <button data-goto="table" aria-current="true">Table</button>
+    <button data-goto="lobby">Lobby</button>
+    <button data-goto="between">Scoreline</button>
+    <button data-goto="win">Payout</button>
+  </nav>
+
+  <div class="stage" id="stage">
+    <div data-screen="table">
+      <div class="pot"><span class="k">Pot</span><span class="v num">1,600</span>
+        <span class="s">800 each · winner takes all</span></div>
+
+      <aside class="plr you on">
+        <div class="top"><span class="av">V</span>
+          <span><span class="nm">Valeria</span><br><span class="st">Your turn</span></span></div>
+        <div class="big num">118<small>pips</small></div>
+        <div class="dots" id="dotYou"></div>
+        <div class="r"><span>Borne off</span><b class="num">2/15</b></div>
+        <div class="r"><span>Match</span><b class="num">3/5</b></div>
+      </aside>
+
+      <aside class="plr foe">
+        <div class="top"><span class="av">K</span>
+          <span><span class="nm">0xKai</span><br><span class="st">Waiting</span></span></div>
+        <div class="big num">131<small>pips</small></div>
+        <div class="dots" id="dotFoe"></div>
+        <div class="r"><span>Borne off</span><b class="num">1/15</b></div>
+        <div class="r"><span>Match</span><b class="num">1/5</b></div>
+      </aside>
+
+      <div class="slot"><div class="board">
+        <img id="boardImg" src="/assets/neo/board-clay.png" alt="Block Party board">
+        <div class="play" id="play"></div></div></div>
+
+      <div class="dock"><span class="lbl">Moves</span><span class="toks" id="toks"></span>
+        <button class="go" id="btnRoll">Roll</button></div>
+      <div class="mark">Block Party</div>
+      <div class="tools"><button>Sound</button><button>Rules</button></div>
+    </div>
+
+    <div data-screen="lobby" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">Open tables</div>
+      <div class="title">Who's playing<em>?</em></div>
+      <div class="tables">
+        <div class="tcard" data-goto="table"><h4>0xKai</h4>
+          <div class="meta">Match to 5 · 0:42</div><div class="buy num">800 ◆</div></div>
+        <div class="tcard" data-goto="table"><h4>mona.eth</h4>
+          <div class="meta">Single game · 2:17</div><div class="buy num">200 ◆</div></div>
+        <div class="tcard" data-goto="table"><h4>ryu_88</h4>
+          <div class="meta">Match to 7 · 5:03</div><div class="buy num">2,000 ◆</div></div>
+      </div>
+      <div class="row2"><button class="go" data-goto="table">Create table</button></div>
+    </div></div></div>
+
+    <div data-screen="between" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">Match to 5 · game 3 done</div>
+      <div class="title">Valeria takes it<em>!</em></div>
+      <div class="score"><div class="side"><b class="num">3</b><span>Valeria</span></div><i>vs</i>
+        <div class="side"><b class="num">1</b><span>0xKai</span></div></div>
+      <p class="note">Gammon — that one counts <b>double</b>. The pot stays put: <b>1,600 ◆</b> goes to
+        whoever wins the match. <b>2</b> points to go.</p>
+      <div class="row2"><button class="go alt" data-goto="lobby">Resign match</button>
+        <button class="go" data-goto="table">Next game</button></div>
+    </div></div></div>
+
+    <div data-screen="win" hidden><div class="sheet"><div class="inner">
+      <div class="eyebrow">Match over</div>
+      <div class="title">You win<em>!</em></div>
+      <div class="score"><div class="side"><b class="num">+1,600</b><span>Paid out</span></div></div>
+      <p class="note">Won <b>5–2</b>. Your <b>800 ◆</b> is back, and so is theirs.</p>
+      <div class="row2"><button class="go alt" data-goto="lobby">Lobby</button>
+        <button class="go" data-goto="table">Rematch · 800 ◆</button></div>
+    </div></div></div>
+  </div>
+
+  <div class="tests">
+    <button id="tRoll">▶ Roll the dice</button>
+    <button id="tDouble">▶ Doubles callout</button>
+    <button id="tHit">▶ Hit callout</button>
+    <button id="tSfx">▶ Sound set</button>
+  </div>
+
+  <div class="legend">
+    <div><h4>Type <em>·</em></h4><p>Baloo 2 for everything with a voice, Nunito for small labels,
+      JetBrains Mono for numbers. Round, generous, never thin.</p></div>
+    <div><h4>Pieces <em>·</em></h4><p>Fat pucks with a visible coloured side. A movable checker hops
+      with real squash and stretch instead of just lifting.</p></div>
+    <div><h4>Callout <em>·</em></h4><p>A soft asymmetric blob that overshoots on the way in. Same
+      contained size as the others — it never covers the board.</p></div>
+    <div><h4>Sound <em>·</em></h4><p>Round and bouncy. Rising pops for a placed checker, a tumbling
+      run for the throw, a fat low thud on a hit.</p></div>
+  </div>
+</div>
+
+<script src="/assets/neo/table.js"></script>
+<script>
+const POS={w:{5:2,6:3,8:2,11:2,13:3,18:1}, b:{1:2,3:1,12:3,17:3,19:4},
+  bar:{w:0,b:1}, sel:13, can:[6,8,13], spots:[8,10],
+  dice:[5,3], used:[false,true], cube:2, cubeOwner:"you"};
+const stage=document.getElementById('stage'), play=document.getElementById('play');
+const SFX=NeoTable.makeSFX('pop');
+let GEOM;
+NeoTable.boot(document.getElementById('boardImg')).then(g=>{
+  GEOM=g; NeoTable.renderBoard(play,GEOM,POS,{chip:0.064});
+});
+const dots=(id,n)=>{document.getElementById(id).innerHTML=
+  Array.from({length:15},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')};
+dots('dotYou',2); dots('dotFoe',1);
+document.getElementById('toks').innerHTML=POS.dice
+  .map((v,k)=>`<span class="tok${POS.used[k]?' used':''}">${NeoTable.pips(v)}</span>`).join('');
+NeoTable.wireScreens(document.body);
+
+function doRoll(){
+  if(!GEOM) return;
+  NeoTable.rollDice(play, faces=>{
+    const dbl=faces[0]===faces[1];
+    NeoTable.callout(stage, dbl?'double':'roll', NeoTable.faceGlyphs(faces[0],faces[1]),
+      dbl?`Double ${faces[0]}! Four moves`:`${faces[0]} and ${faces[1]}`);
+    document.getElementById('toks').innerHTML=(dbl?[faces[0],faces[0],faces[0],faces[0]]:faces)
+      .map(v=>`<span class="tok">${NeoTable.pips(v)}</span>`).join('');
+  }, SFX);
+}
+document.getElementById('btnRoll').onclick=doRoll;
+document.getElementById('tRoll').onclick=doRoll;
+document.getElementById('tDouble').onclick=()=>{
+  NeoTable.callout(stage,'double',NeoTable.faceGlyphs(5,5),'Double 5! Four moves'); SFX.hit();};
+document.getElementById('tHit').onclick=()=>{
+  NeoTable.callout(stage,'hit','','Knocked to the bar!'); SFX.hit();};
+document.getElementById('tSfx').onclick=()=>{
+  SFX.place(); setTimeout(SFX.roll,420); setTimeout(SFX.hit,1250); setTimeout(SFX.win,1900);};
+</script>
+</body>
+</html>

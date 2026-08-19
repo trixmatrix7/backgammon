@@ -1,0 +1,11 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+contracts/out
+contracts/cache
+contracts/lib
+
+# Vercel
+.vercel

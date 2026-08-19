@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEO GAMMON MAX — art direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=M+PLUS+1+Code:wght@500;700&family=Bungee&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   NEO GAMMON — MAX
+   The same construction rule as v1, pushed: flat fill, thick ink outline, ONE
+   hard highlight, one flat shadow. Nothing on this screen uses a gradient, a
+   blur or a glow. What is new here is everything AROUND the board — the beats.
+   ========================================================================== */
+:root{
+  --ink:#0d0a18; --paper:#fdfbf2;
+  --hot:#ff1f7a;          /* the one hot accent */
+  --lime:#c6ff2e;         /* the one cold accent */
+  --violet:#2a1150;
+  --deep:#160828;
+  --line:5px;
+  --jp:"Zen Kaku Gothic New", system-ui, sans-serif;
+  --num:"M PLUS 1 Code", ui-monospace, monospace;
+  --badge:"Bungee", sans-serif;
+}
+*{box-sizing:border-box; margin:0}
+body{background:var(--ink); color:var(--paper); font-family:var(--jp); -webkit-font-smoothing:antialiased}
+.num{font-family:var(--num); font-variant-numeric:tabular-nums}
+[hidden]{display:none !important}
+
+.wrap{max-width:1500px; margin:0 auto; padding:26px 22px 70px}
+.head{display:flex; align-items:flex-end; gap:22px; flex-wrap:wrap; margin-bottom:18px}
+.head h1{
+  font:900 clamp(30px,5vw,52px)/.92 var(--jp); letter-spacing:-.03em; text-transform:uppercase;
+  transform:skewX(-8deg); text-shadow:5px 5px 0 var(--hot), 10px 10px 0 var(--lime), 15px 15px 0 var(--ink);
+}
+.head .jp{font:700 12px var(--jp); letter-spacing:.55em; color:var(--lime); margin-bottom:9px}
+.head p{flex:1 1 320px; font:500 13px/1.7 var(--jp); color:#a99cc4; max-width:60ch}
+.head p b{color:var(--paper); font-weight:700}
+
+/* screen switcher */
+.nav{display:flex; gap:7px; flex-wrap:wrap; margin:0 0 16px}
+.nav button{
+  font:900 12px var(--jp); letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+  padding:9px 15px; background:var(--paper); color:var(--ink);
+  border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink); transform:skewX(-8deg);
+}
+.nav button span{display:block; transform:skewX(8deg)}
+.nav button[aria-current="true"]{background:var(--hot); color:var(--paper); box-shadow:4px 4px 0 var(--lime)}
+
+/* ==========================================================================
+   STAGE
+   ========================================================================== */
+.stage{
+  position:relative; aspect-ratio:16/9; overflow:hidden; container-type:inline-size;
+  border:var(--line) solid var(--ink); background:var(--deep);
+  box-shadow:14px 14px 0 var(--ink);
+}
+.stage.shake{animation:shake .34s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{
+  10%{transform:translate(-6px,3px) rotate(-.4deg)} 30%{transform:translate(7px,-4px) rotate(.5deg)}
+  50%{transform:translate(-5px,2px)} 70%{transform:translate(4px,-2px)} 100%{transform:none}
+}
+.bgart{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.6; z-index:0}
+/* Screentone belongs to the ROOM ONLY. It used to sit at z-index 1 over everything, which put a
+   dot grid across the board and across every HUD panel — the panels carry no z-index of their own,
+   so an overlay above them wins. It now lives with the backdrop, under the whole game. */
+.stage::after{
+  content:""; position:absolute; inset:0; z-index:0; pointer-events:none; color:#0b0616; opacity:.4;
+  background-image:radial-gradient(currentColor 1.5px, transparent 1.6px); background-size:8px 8px;
+}
+/* Each screen fills the stage and owns a real stacking context, so its panels sit above the room
+   without needing a z-index each. */
+[data-screen]{position:absolute; inset:0; z-index:3}
+/* speed lines that actually move */
+.speed{
+  position:absolute; inset:-20%; z-index:1; pointer-events:none; opacity:.28;
+  background:repeating-linear-gradient(112deg, transparent 0 30px, rgba(253,251,242,.07) 30px 32px, transparent 32px 68px);
+  -webkit-mask:radial-gradient(56% 50% at 50% 50%, transparent 52%, #000 90%);
+  mask:radial-gradient(56% 50% at 50% 50%, transparent 52%, #000 90%);
+  animation:drift 9s linear infinite;
+}
+@keyframes drift{to{transform:translateX(68px)}}
+
+/* ── the table: header, board, console — one stacked unit ─────────────────
+   The bars are sized to the BOARD's width and sit flush against its edges, so
+   the three read as one chassis. Letting a generated frame supply the opening
+   was tried and abandoned: its opening came back at 2.9:1 against the board's
+   1.54:1, and no amount of prompting makes a generator hit an exact aspect.
+   Owning the widths here means the fit is exact by construction. */
+/* Both bars are drawn inside a 16:9 canvas with empty margins, so each element
+   is given the ARTWORK's aspect and the background is scaled and offset to crop
+   exactly to it. The bounds were measured off the rendered alpha, not guessed:
+   top bar occupies 5.96–94.53 % × 36.41–63.42 % of its canvas, dock 12.99–87.79
+   % × 32.82–68.03 %. */
+.slot{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:52cqw; container-type:inline-size;
+  display:flex; flex-direction:column; align-items:center}
+/* the pot plate, cropped to its own artwork (measured: 102.5/330.5 at 60%/49%) */
+.topbar{
+  /* NB: .slot is itself a container, so cqw in here is a percentage of the
+     BOARD's width, not the screen's. Sizes below are deliberately slot-relative. */
+  position:relative; z-index:2; width:33%; aspect-ratio:5.644; margin-bottom:1.1cqw;
+  background:url("/assets/neo/ui-pot-v.svg") 60% 49%/102.5% 330.5% no-repeat;
+  filter:drop-shadow(.45cqw .5cqw 0 rgba(13,10,24,.5));
+  display:flex; align-items:center; justify-content:center; gap:1.3cqw;
+}
+.board{position:relative; line-height:0; border:var(--line) solid var(--ink); box-shadow:9px 9px 0 rgba(13,10,24,.6)}
+.board > img{display:block; width:100%; height:auto}
+.play{position:absolute; inset:0}
+
+.chk{
+  position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  border:.5cqw solid var(--ink); background:var(--fill);
+  box-shadow:0 .5cqw 0 var(--rim), 0 .5cqw 0 .5cqw var(--ink);
+  transition:top .2s cubic-bezier(.3,1.7,.5,1);
+}
+.chk::before{content:""; position:absolute; inset:15%; border-radius:50%;
+  border:.45cqw solid var(--hi); border-color:var(--hi) transparent transparent var(--hi); transform:rotate(-38deg)}
+.chk.w{--fill:#fdfbf2; --rim:var(--hot); --hi:rgba(13,10,24,.45)}
+.chk.b{--fill:#241040; --rim:var(--lime); --hi:rgba(253,251,242,.72)}
+.chk.can{animation:bob 1.5s ease-in-out infinite}
+@keyframes bob{50%{transform:translate(-50%,calc(-50% - .5cqw))}}
+.chk.sel{outline:.45cqw dashed var(--lime); outline-offset:.28cqw}
+
+.spot{position:absolute; transform:translate(-50%,-50%); aspect-ratio:1; border-radius:50%;
+  border:.45cqw dashed var(--lime); animation:spin 5s linear infinite}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+.die{
+  position:absolute; transform:translate(-50%,-50%) rotate(var(--r,0deg)); aspect-ratio:1;
+  border-radius:22%; background:var(--paper); border:.5cqw solid var(--ink);
+  box-shadow:0 .5cqw 0 #b3accd, 0 .5cqw 0 .5cqw var(--ink);
+}
+.die i{position:absolute; width:19%; aspect-ratio:1; border-radius:50%; background:var(--hot); transform:translate(-50%,-50%)}
+.die.spent{filter:grayscale(1) brightness(.6)}
+.cube{
+  position:absolute; transform:translate(-50%,-50%) rotate(-8deg); aspect-ratio:1;
+  display:grid; place-items:center; border-radius:20%; background:var(--lime); color:var(--ink);
+  border:.5cqw solid var(--ink); box-shadow:0 .5cqw 0 #8fbd1c, 0 .5cqw 0 .5cqw var(--ink);
+  font:700 2.3cqw var(--num);
+}
+
+/* ==========================================================================
+   CALLOUT — a contained burst, never a full-screen flash.
+   A blowout hides the board at exactly the moment you want to see what
+   happened to it. This punches in over the table and gets out.
+   ========================================================================== */
+.callout{
+  position:absolute; left:50%; top:40%; z-index:20; pointer-events:none;
+  width:26cqw; aspect-ratio:1; display:grid; place-items:center;
+  transform:translate(-50%,-50%) scale(.4) rotate(-8deg); opacity:0;
+}
+.callout.in{
+  opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-8deg);
+  transition:transform .26s cubic-bezier(.2,1.9,.4,1), opacity .12s linear;
+}
+.callout.out{opacity:0; transform:translate(-50%,-50%) scale(1.14) rotate(-8deg); transition:all .3s ease-in}
+/* the jagged manga burst, cut with a computed star polygon */
+.co-burst{
+  position:absolute; inset:0; background:var(--paper); clip-path:var(--burst);
+  box-shadow:0 0 0 .4cqw var(--ink);
+}
+.callout.hot .co-burst{background:var(--hot)}
+.callout.good .co-burst{background:var(--lime)}
+/* a second, larger burst behind it in the ink colour = the outline */
+.callout::before{
+  content:""; position:absolute; inset:-1.1cqw; background:var(--ink); clip-path:var(--burst); z-index:-1;
+}
+/* radiating ray lines, screentone-style */
+.callout::after{
+  content:""; position:absolute; inset:-40%; z-index:-2; pointer-events:none;
+  background:repeating-conic-gradient(from 0deg, var(--ink) 0 2.6deg, transparent 2.6deg 8deg);
+  -webkit-mask:radial-gradient(circle, transparent 34%, #000 42%, transparent 68%);
+  mask:radial-gradient(circle, transparent 34%, #000 42%, transparent 68%);
+  animation:rays .7s ease-out forwards;
+}
+@keyframes rays{from{transform:scale(.5) rotate(0); opacity:.9} to{transform:scale(1.25) rotate(16deg); opacity:0}}
+.co-body{position:relative; z-index:1; text-align:center; color:var(--ink); padding:0 2cqw}
+.callout.hot .co-body{color:var(--paper)}
+.co-big{display:flex; justify-content:center; gap:.7cqw; font:700 3.4cqw/1 var(--num); letter-spacing:-.04em}
+.co-word{display:block; margin-top:.5cqw; font:900 1.5cqw var(--jp); letter-spacing:.1em; text-transform:uppercase; transform:skewX(-8deg)}
+/* dice faces inside a callout */
+.co-face{
+  position:relative; width:3.6cqw; aspect-ratio:1; border-radius:22%;
+  background:var(--ink); border:.35cqw solid var(--ink); display:inline-block;
+}
+.callout.hot .co-face{background:var(--paper)}
+.co-face i{position:absolute; width:19%; aspect-ratio:1; border-radius:50%; background:var(--paper); transform:translate(-50%,-50%)}
+.callout.hot .co-face i{background:var(--hot)}
+
+/* ==========================================================================
+   HUD
+   ========================================================================== */
+/* ── HUD, now built on generated panel art ────────────────────────────────
+   Each panel is a drawn asset with an EMPTY interior; the live values are laid
+   over it in percentage-positioned bands. That is the split that matters: the
+   art carries the character, the DOM carries the data, and neither has to be
+   regenerated when the other changes.
+   `background-size:100% 100%` is deliberate — the panel is meant to stretch to
+   the slot it is given, the way a nine-slice would.
+   ────────────────────────────────────────────────────────────────────────── */
+.panel{position:absolute; color:var(--ink)}
+.cut{}
+
+/* ONE card asset, mirrored for the opponent.
+   The generated violet twin came back without its ink outline (the cutout ate
+   it) and read as a flat slab next to the drawn one. Flipping the good card
+   gives a genuinely matched pair for free: accent stripe on each player's
+   OUTER edge, notch mirrored, identical weight. The seat is told apart by the
+   stripe colour, the checker dot and the ladder — not by the panel. */
+.plr{
+  width:15cqw; aspect-ratio:3/4; top:4.6cqw;
+  background:url("/assets/neo/ui-card-you-cut.png") center/100% 100% no-repeat;
+  filter:drop-shadow(.45cqw .5cqw 0 rgba(13,10,24,.55));
+}
+.plr.you{left:2cqw}
+.plr.foe{right:2cqw; transform:scaleX(-1)}
+.plr.foe > *{transform:scaleX(-1)}          /* un-flip the contents */
+/* the mirrored stripe is magenta in the source — cover it in the seat's lime */
+.plr.foe::after{
+  content:""; position:absolute; left:1.6%; top:2.4%; bottom:2.4%; width:3.4%;
+  background:var(--lime); box-shadow:0 0 0 .12cqw var(--ink);
+}
+/* the three empty bands the art draws, addressed as percentages of the card */
+.plr .band{position:absolute; left:9%; right:7%}
+.plr.foe .band{left:9%; right:7%}
+.plr .b1{top:5%;  height:25%}
+.plr .b2{top:33%; height:26%}
+.plr .b3{top:63%; height:22%}   /* stops short of the notch the art cuts out */
+/* whoever owns the cube says so on their own card, pinned to the outer corner */
+.cubechip{
+  position:absolute; bottom:-1cqw; left:-.5cqw; z-index:2;
+  padding:.2cqw .55cqw .26cqw; background:var(--lime); color:var(--ink);
+  border:.28cqw solid var(--ink); font:900 .62cqw var(--jp); letter-spacing:.16em;
+  transform:rotate(-2deg);
+}
+.cubechip b{font:700 .8cqw var(--num); margin-left:.2cqw}
+.plr .band{display:flex; flex-direction:column; justify-content:center}
+
+.plr .nm{display:flex; align-items:center; gap:.4cqw; font:900 1.15cqw/1 var(--jp);
+  text-transform:uppercase; transform:skewX(-7deg)}
+.plr .nm .d{width:.85cqw; height:.85cqw; border-radius:50%; border:.22cqw solid var(--ink); flex:none}
+.plr.you .nm .d{background:var(--paper); box-shadow:0 0 0 .16cqw var(--hot)}
+.plr.foe .nm .d{background:var(--violet); box-shadow:0 0 0 .16cqw var(--lime)}
+.plr .kana{font:700 .56cqw var(--jp); letter-spacing:.3em; opacity:.6; margin-top:.32cqw}
+.plr .row{display:flex; align-items:flex-end; gap:.5cqw}
+.plr .big{font:700 2.3cqw/1 var(--num); letter-spacing:-.04em}
+.plr .u{font:700 .56cqw var(--jp); letter-spacing:.2em; padding-bottom:.3cqw; opacity:.65}
+.plr .bar{height:.7cqw; margin-top:.45cqw; display:flex; gap:.08cqw}
+.plr .bar i{flex:1; background:rgba(13,10,24,.16)}
+.plr .bar i.on{background:var(--hot)}
+.plr.foe .bar i.on{background:#8fbd1c}
+.plr .ft{display:flex; justify-content:space-between; align-items:baseline;
+  font:700 .6cqw var(--jp); letter-spacing:.12em; text-transform:uppercase; opacity:.7}
+.plr .ft + .ft{margin-top:.28cqw}
+.plr .ft b{font:700 .92cqw var(--num); opacity:1}
+.plr.on{filter:drop-shadow(.6cqw .7cqw 0 var(--hot))}
+.plr.on::before{
+  content:"ON ROLL"; position:absolute; top:-1.2cqw; left:-.4cqw; z-index:2;
+  padding:.2cqw .6cqw .26cqw; background:var(--hot); color:var(--paper);
+  border:.28cqw solid var(--ink); font:900 .68cqw var(--jp); letter-spacing:.2em; transform:rotate(-3deg);
+}
+
+/* pot — the drawn plate, squashed to a strip. It says two things and no more:
+   the word and the number. Everything else that used to sit here (stake per
+   player, winner-takes-all) is a lobby fact, not something you read mid-turn. */
+/* the pot now lives in the header bar itself */
+.pot{display:none}
+.topbar{display:flex; align-items:center; justify-content:center; gap:.9cqw; color:var(--paper)}
+.topbar .k{font:900 1.15cqw var(--jp); letter-spacing:.3em; opacity:.85}
+.topbar .v{font:700 2.8cqw/1 var(--num); letter-spacing:-.03em}
+.pot .s{display:none}
+
+/* dock — sockets and the action button are drawn INTO the art, so the tokens
+   and the label are placed on top at the coordinates the art put them at. */
+/* The art is 16:9 and mostly air, so the bar is SQUASHED into the slot it is
+   given. Because the background is stretched 100%/100%, every drawn feature
+   keeps its percentage position — so the sockets and the button can be hit
+   exactly, at any squash, with the coordinates measured off the source file. */
+/* The console is ONE drawn piece — housing, recessed slots and the action key
+   all in the same art, so nothing has to be faked on top of it. The tokens and
+   the label are placed at coordinates measured off the 1344×768 source; because
+   the background stretches 100%/100%, they stay locked to the drawn features
+   whatever size the bar is given. */
+/* VECTOR, not raster.
+   Every raster attempt at this bar went soft the moment it was scaled, and each
+   generation came back with a different line weight, so no two panels matched.
+   Recraft's vector mode returns real SVG: sharp at any size, one even stroke
+   across the whole kit, and its white backing is a single path that can simply
+   be deleted — so there is no cutout to eat the ink outline either. */
+/* No housing bar. The white field never looked as clean as the drawn key, and
+   laying my tokens over someone else's drawn holes could never line up — so the
+   holes are gone and the dice stand on their own, drawn here in the board's
+   own language. They cannot be misaligned because nothing else defines where
+   they go. */
+.dock{
+  position:relative; z-index:2; margin-top:1.5cqw; width:100%;
+  display:flex; align-items:center; justify-content:center; gap:2cqw;
+  background:none; filter:none;
+}
+.dock .lbl{display:none}
+.toks{display:flex; gap:.85cqw}
+/* cqw, not % — a percentage here would resolve against an auto-width flexbox */
+.tok{
+  position:relative; width:5.6cqw; aspect-ratio:1; border-radius:.6cqw;
+  background:var(--paper); border:.5cqw solid var(--ink);
+  box-shadow:0 .5cqw 0 #b3accd, 0 .5cqw 0 .5cqw var(--ink);
+}
+.tok i{position:absolute; width:19%; aspect-ratio:1; border-radius:50%;
+  background:var(--hot); transform:translate(-50%,-50%)}
+.tok.used{filter:grayscale(1) brightness(.72)}
+/* THE ACTION — the drawn key, cut out, covering the softer one the bar art
+   included. The label rides on its face; the press moves the whole key down
+   onto its own side, which the art already draws. */
+/* The key is drawn into the console; this is only its hit area and its label,
+   sitting on the green face. Pressing drops it onto the side the art draws. */
+/* the clean drawn key, cropped to its artwork (measured: 136.2/139.1 at 50%/50%) */
+.go{
+  position:relative; flex:none; width:17cqw; aspect-ratio:1.022; cursor:pointer;
+  background:url("/assets/neo/ui-key-v.svg") 50% 50%/136.2% 139.1% no-repeat;
+  border:0; padding:0; color:var(--ink);
+  font:900 2.7cqw var(--jp); text-transform:uppercase; letter-spacing:.01em;
+  display:grid; place-items:center; transition:transform .07s;
+}
+.go span{display:block; transform:skewX(-9deg) translateY(-8%)}
+.go:hover{transform:translateY(-.25cqw)}
+.go:active{transform:translateY(.5cqw)}
+/* the secondary buttons on the other screens keep the drawn key as an image */
+.go.alt{position:static; transform:none; width:auto; aspect-ratio:auto; padding:.9cqw 2.2cqw;
+  background:var(--paper); border:var(--line) solid var(--ink); box-shadow:.55cqw .55cqw 0 var(--ink)}
+.sheet .go{position:static; transform:none; width:auto; aspect-ratio:auto; padding:.9cqw 2.4cqw;
+  background:var(--lime); border:var(--line) solid var(--ink); box-shadow:.55cqw .55cqw 0 var(--ink)}
+.sheet .go:active{transform:translate(.3cqw,.3cqw); box-shadow:.2cqw .2cqw 0 var(--ink)}
+
+.logo{left:2cqw; bottom:1.8cqw; padding:.45cqw .9cqw .55cqw; background:var(--ink); color:var(--paper);
+  border:.3cqw solid var(--paper); font-family:var(--badge); font-size:1.05cqw; transform:rotate(-2deg)}
+.logo em{font-style:normal; color:var(--lime)}
+.tools{right:2cqw; bottom:1.8cqw; display:flex; gap:.5cqw; background:none; border:0; box-shadow:none}
+.tools button{font:900 .8cqw var(--jp); letter-spacing:.14em; text-transform:uppercase; cursor:pointer;
+  padding:.5cqw .95cqw; background:var(--paper); color:var(--ink); border:.3cqw solid var(--ink); box-shadow:.3cqw .3cqw 0 var(--ink)}
+
+/* ==========================================================================
+   THE OTHER SCREENS — same language, no board
+   ========================================================================== */
+.sheet{position:absolute; inset:0; display:grid; place-items:center; padding:3cqw; z-index:5}
+.sheet .inner{width:min(70cqw,100%); text-align:center}
+.eyebrow{font:700 .9cqw var(--jp); letter-spacing:.5em; text-transform:uppercase; color:var(--lime)}
+.title{font:900 5cqw/.95 var(--jp); text-transform:uppercase; transform:skewX(-8deg); margin-top:1cqw;
+  text-shadow:.35cqw .35cqw 0 var(--hot), .7cqw .7cqw 0 var(--ink)}
+.score{display:flex; justify-content:center; align-items:flex-end; gap:3cqw; margin-top:2.4cqw}
+.score .side{display:flex; flex-direction:column; align-items:center; gap:.7cqw}
+.score .side b{font:700 5.6cqw/1 var(--num)}
+.score .side span{font:900 1.1cqw var(--jp); letter-spacing:.14em; text-transform:uppercase; padding:.35cqw .9cqw;
+  background:var(--paper); color:var(--ink); border:.3cqw solid var(--ink); transform:skewX(-8deg)}
+.score > i{font:700 3cqw var(--num); font-style:normal; color:var(--lime); padding-bottom:1cqw}
+.note{margin-top:2cqw; font:500 1.05cqw/1.7 var(--jp); color:#b4a7ce}
+.note b{color:var(--paper); font-weight:700}
+.row{display:flex; gap:1cqw; justify-content:center; margin-top:2.4cqw; flex-wrap:wrap}
+
+/* lobby */
+.tables{display:grid; grid-template-columns:repeat(3,1fr); gap:1.2cqw; margin-top:2cqw}
+.tcard{background:var(--paper); color:var(--ink); border:var(--line) solid var(--ink);
+  box-shadow:.6cqw .6cqw 0 var(--ink); padding:1.1cqw; text-align:left; cursor:pointer}
+.tcard:hover{transform:translate(-.15cqw,-.15cqw); box-shadow:.85cqw .85cqw 0 var(--hot)}
+.tcard h4{font:900 1.4cqw var(--jp); text-transform:uppercase; transform:skewX(-7deg)}
+.tcard .meta{margin-top:.5cqw; font:700 .78cqw var(--jp); letter-spacing:.12em; text-transform:uppercase; opacity:.6}
+.tcard .buy{margin-top:.9cqw; font:700 1.6cqw var(--num); color:var(--ink)}
+.tcard .buy small{font-size:.55em; opacity:.5}
+
+/* ── page furniture ───────────────────────────────────────────────────────── */
+.tests{display:flex; gap:9px; margin-top:20px; flex-wrap:wrap}
+.tests button{font:900 12.5px var(--jp); text-transform:uppercase; cursor:pointer; padding:11px 18px;
+  background:var(--paper); color:var(--ink); border:3px solid var(--ink); box-shadow:5px 5px 0 var(--lime)}
+.tests button:active{transform:translate(3px,3px); box-shadow:2px 2px 0 var(--lime)}
+.legend{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-top:24px}
+.legend div{border-left:4px solid var(--hot); padding:2px 0 2px 13px}
+.legend h4{font:900 12px var(--jp); letter-spacing:.16em; text-transform:uppercase}
+.legend h4 em{font-style:normal; color:var(--lime); letter-spacing:.3em; margin-left:6px}
+.legend p{margin-top:5px; font:500 12.5px/1.6 var(--jp); color:#a99cc4}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="jp">ネオ・ギャモン ＭＡＸ</div>
+      <h1>Neo Gammon <span style="color:var(--lime)">MAX</span></h1>
+    </div>
+    <p>Same construction rule as v1 — flat fill, thick ink, one hard highlight, no gradients anywhere —
+    but pushed, and now with the screens either side of the table. The impact frame is <b>contained in
+    a shape</b> rather than blowing out the whole screen, so the position stays readable while the
+    beat lands.</p>
+  </header>
+
+  <nav class="nav" id="nav">
+    <button data-goto="table" aria-current="true"><span>Table</span></button>
+    <button data-goto="lobby"><span>Lobby</span></button>
+    <button data-goto="between"><span>Scoreline</span></button>
+    <button data-goto="win"><span>Payout</span></button>
+  </nav>
+
+  <div class="stage" id="stage">
+    <img class="bgart" src="/assets/neo/backdrop.png" alt="">
+    <div class="speed"></div>
+
+    <!-- ═══ TABLE ═══ -->
+    <div data-screen="table">
+      <div class="panel pot">
+        <span class="k">POT</span><span class="v num">1,600</span>
+        <span class="s">800 EACH · WINNER TAKES ALL</span>
+      </div>
+
+      <aside class="panel plr you on">
+        <div class="band b1">
+          <div class="nm"><span class="d"></span>VALERIA</div>
+          <div class="kana">ホワイト</div>
+        </div>
+        <div class="band b2">
+          <div class="row"><span class="big num">118</span><span class="u">PIPS</span></div>
+          <div class="bar" id="barYou"></div>
+        </div>
+        <div class="band b3">
+          <div class="ft"><span>Borne off</span><b class="num">2/15</b></div>
+          <div class="ft"><span>Match</span><b class="num">3/5</b></div>
+        </div>
+        <span class="cubechip">CUBE <b class="num">2</b></span>
+      </aside>
+
+      <aside class="panel plr foe">
+        <div class="band b1">
+          <div class="nm"><span class="d"></span>0xKAI</div>
+          <div class="kana">ブラック</div>
+        </div>
+        <div class="band b2">
+          <div class="row"><span class="big num">131</span><span class="u">PIPS</span></div>
+          <div class="bar" id="barFoe"></div>
+        </div>
+        <div class="band b3">
+          <div class="ft"><span>Borne off</span><b class="num">1/15</b></div>
+          <div class="ft"><span>Match</span><b class="num">1/5</b></div>
+        </div>
+      </aside>
+
+      <div class="slot">
+        <div class="topbar">
+          <span class="k">POT</span><span class="v num">1,600</span>
+        </div>
+        <div class="board"><img id="boardImg" src="/assets/neo/board-max.png" alt="Neo Gammon Max board">
+          <div class="play" id="play"></div></div>
+        <div class="dock">
+          <span class="toks" id="toks"></span>
+          <button class="go" id="btnRoll"><span>Roll</span></button>
+        </div>
+      </div>
+
+      <div class="panel logo">NEO <em>MAX</em></div>
+      <div class="panel tools"><button>Sound</button><button>Rules</button></div>
+    </div>
+
+    <!-- ═══ LOBBY ═══ -->
+    <div data-screen="lobby" hidden>
+      <div class="sheet"><div class="inner">
+        <div class="eyebrow">Open tables</div>
+        <div class="title">Pick a fight</div>
+        <div class="tables">
+          <div class="tcard" data-goto="table">
+            <h4>0xKai</h4><div class="meta">Match to 5 · waiting 0:42</div>
+            <div class="buy num">800 <small>◆</small></div>
+          </div>
+          <div class="tcard" data-goto="table">
+            <h4>mona.eth</h4><div class="meta">Single game · waiting 2:17</div>
+            <div class="buy num">200 <small>◆</small></div>
+          </div>
+          <div class="tcard" data-goto="table">
+            <h4>ryu_88</h4><div class="meta">Match to 7 · waiting 5:03</div>
+            <div class="buy num">2,000 <small>◆</small></div>
+          </div>
+        </div>
+        <div class="row"><button class="go" data-goto="table"><span>Create table</span></button></div>
+      </div></div>
+    </div>
+
+    <!-- ═══ SCORELINE ═══ -->
+    <div data-screen="between" hidden>
+      <div class="sheet"><div class="inner">
+        <div class="eyebrow">Match to 5 · game 3 done</div>
+        <div class="title">Game to Valeria</div>
+        <div class="score">
+          <div class="side"><b class="num">3</b><span>Valeria</span></div>
+          <i>:</i>
+          <div class="side"><b class="num">1</b><span>0xKai</span></div>
+        </div>
+        <p class="note">Gammon — worth <b>2</b>. The pot does not move: <b>1,600 ◆</b> goes to whoever
+          takes the match. Valeria needs <b>2</b> more points.</p>
+        <div class="row">
+          <button class="go alt" data-goto="lobby"><span>Resign match</span></button>
+          <button class="go" data-goto="table"><span>Next game</span></button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══ PAYOUT ═══ -->
+    <div data-screen="win" hidden>
+      <div class="sheet"><div class="inner">
+        <div class="eyebrow">Match over</div>
+        <div class="title">You win</div>
+        <div class="score"><div class="side"><b class="num">+1,600</b><span>Paid out</span></div></div>
+        <p class="note">Match taken <b>5–2</b>. Your stake of <b>800 ◆</b> is back, plus theirs.</p>
+        <div class="row">
+          <button class="go alt" data-goto="lobby"><span>Lobby</span></button>
+          <button class="go" data-goto="table"><span>Rematch · 800 ◆</span></button>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="tests">
+    <button id="tRoll">▶ Roll the dice</button>
+    <button id="tDouble">▶ Doubles callout</button>
+    <button id="tHit">▶ Hit callout</button>
+    <button id="tBear">▶ Bear-off callout</button>
+    <button id="tSfx">▶ Sound set</button>
+  </div>
+
+  <div class="legend">
+    <div><h4>Callout <em>演出</em></h4><p>A contained burst over the table, not a full-screen flash —
+      the board stays readable while the beat lands. Fires on the throw, on doubles, on a hit, on a bear-off.</p></div>
+    <div><h4>Screens <em>画面</em></h4><p>Table, lobby, scoreline and payout in one language.
+      Switch them with the row of tabs above.</p></div>
+    <div><h4>Type <em>書体</em></h4><p>Zen Kaku Gothic New 900 skewed 8°, M PLUS 1 Code for every
+      number, Bungee for the wordmark. Three cuts, no more.</p></div>
+    <div><h4>Motion <em>動き</em></h4><p>Movable checkers bob. Doubles and hits shake the whole table.
+      Speed lines drift continuously behind the board.</p></div>
+  </div>
+</div>
+
+<script src="/assets/neo/table.js"></script>
+<script>
+/* The burst silhouette, computed once so it is exactly symmetrical. */
+(function(){
+  var pts=[], spikes=15;
+  for(var i=0;i<spikes*2;i++){
+    var a=(i/(spikes*2))*Math.PI*2 - Math.PI/2;
+    var r=(i%2 ? 34 : 50);
+    pts.push((50+r*Math.cos(a)).toFixed(2)+"% "+(50+r*Math.sin(a)).toFixed(2)+"%");
+  }
+  document.documentElement.style.setProperty("--burst","polygon("+pts.join(",")+")");
+})();
+
+const POS = {
+  w:{5:2, 6:3, 8:2, 11:2, 13:3, 18:1},
+  b:{1:2, 3:1, 12:3, 17:3, 19:4},
+  bar:{w:0,b:1}, sel:13, can:[6,8,13], spots:[8,10],
+  dice:[5,3], used:[false,true], cube:2, cubeOwner:"you",
+};
+
+const stage = document.getElementById('stage');
+const play  = document.getElementById('play');
+const SFX   = NeoTable.makeSFX('ink');
+let GEOM;
+
+NeoTable.boot(document.getElementById('boardImg')).then(g => {
+  GEOM = g;
+  NeoTable.renderBoard(play, GEOM, POS, {chip:0.066});
+});
+
+const ladder=(id,n)=>{document.getElementById(id).innerHTML=
+  Array.from({length:15},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')};
+ladder('barYou',2); ladder('barFoe',1);
+document.getElementById('toks').innerHTML = POS.dice
+  .map((v,k)=>`<span class="tok${POS.used[k]?' used':''}">${NeoTable.pips(v)}</span>`).join('');
+
+NeoTable.wireScreens(document.getElementById('stage').parentElement);
+
+const shake = () => { stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+  setTimeout(()=>stage.classList.remove('shake'),400); };
+
+/* the throw: tumble, settle, then the callout reports what you got */
+function doRoll(){
+  if(!GEOM) return;
+  NeoTable.rollDice(play, faces => {
+    const dbl = faces[0]===faces[1];
+    NeoTable.callout(stage, dbl?'double':'roll', NeoTable.faceGlyphs(faces[0],faces[1]),
+      dbl ? `${faces[0]}·${faces[1]} — FOUR MOVES` : null);
+    if(dbl){ shake(); SFX.hit(); }
+    document.getElementById('toks').innerHTML =
+      (dbl ? [faces[0],faces[0],faces[0],faces[0]] : faces)
+        .map(v=>`<span class="tok">${NeoTable.pips(v)}</span>`).join('');
+  }, SFX);
+}
+document.getElementById('btnRoll').onclick = doRoll;
+document.getElementById('tRoll').onclick   = doRoll;
+document.getElementById('tDouble').onclick = ()=>{
+  NeoTable.callout(stage,'double',NeoTable.faceGlyphs(5,5),'5·5 — FOUR MOVES'); shake(); SFX.hit(); };
+document.getElementById('tHit').onclick    = ()=>{
+  NeoTable.callout(stage,'hit','','SENT TO THE BAR'); shake(); SFX.hit(); };
+document.getElementById('tBear').onclick   = ()=>{
+  NeoTable.callout(stage,'bear','3','BORNE OFF'); SFX.place(); };
+document.getElementById('tSfx').onclick    = ()=>{
+  SFX.place(); setTimeout(SFX.roll,420); setTimeout(SFX.hit,1250); setTimeout(SFX.win,1900); };
+</script>
+</body>
+</html>

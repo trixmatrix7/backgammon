@@ -1,0 +1,126 @@
+/* The sound bench at /?sound — plain on purpose, so nothing competes with the ears. */
+
+.lab {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 40px 26px 80px;
+  background: #160828;
+  color: #fdfbf2;
+  font-family: "Zen Kaku Gothic New", system-ui, sans-serif;
+}
+.lab > * { max-width: 900px; margin-inline: auto; }
+.lab h1 {
+  font-weight: 900;
+  font-size: clamp(30px, 5vw, 46px);
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  transform: skewX(-8deg);
+  text-shadow: 4px 4px 0 #ff1f7a, 8px 8px 0 #0d0a18;
+}
+.lab header p { margin-top: 18px; font-size: 13.5px; line-height: 1.75; color: #a99cc4; max-width: 66ch; }
+.lab .vol { display: flex; align-items: center; gap: 12px; margin-top: 20px; font: 700 11px/1 inherit; letter-spacing: 0.18em; text-transform: uppercase; color: #a99cc4; }
+.lab .vol input { width: 200px; }
+.lab .vol b { font-family: "M PLUS 1 Code", monospace; color: #c6ff2e; }
+
+.lab section { margin-top: 34px; border-top: 1px solid rgba(253, 251, 242, 0.12); padding-top: 20px; }
+.lab h2 { font-weight: 900; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; }
+.lab section p { margin-top: 6px; font-size: 12.5px; line-height: 1.65; color: #a99cc4; max-width: 70ch; }
+.lab .row { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.lab button {
+  font: 900 13px "Zen Kaku Gothic New", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  padding: 11px 20px;
+  min-width: 108px;
+  background: #fdfbf2;
+  color: #0d0a18;
+  border: 3px solid #0d0a18;
+  box-shadow: 4px 4px 0 #0d0a18;
+  transition: transform 0.06s, box-shadow 0.06s, background 0.1s;
+}
+.lab button:hover { background: #c6ff2e; }
+.lab button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #0d0a18; }
+.lab button.on { background: #ff1f7a; color: #fdfbf2; box-shadow: 4px 4px 0 #c6ff2e; }
+.lab button.wide { min-width: 260px; }
+/* family tabs */
+.lab .tabs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 30px; }
+.lab .tabs button { min-width: 0; padding: 10px 16px; font-size: 12px; }
+.lab .tabs button em {
+  display: inline-block; margin: 0 0 0 8px; font: 700 9px "M PLUS 1 Code", monospace;
+  font-style: normal; opacity: 0.45;
+}
+.lab .tabs button.on em { opacity: 0.8; }
+
+/* the shelf grid: hear on the left, assign on the right */
+.lab .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-top: 4px; }
+.lab .tile {
+  display: flex; align-items: stretch; border: 3px solid #0d0a18; box-shadow: 4px 4px 0 #0d0a18;
+  background: #fdfbf2; overflow: hidden;
+}
+.lab .tile.on { box-shadow: 4px 4px 0 #c6ff2e; border-color: #c6ff2e; }
+.lab .tile button { border: 0; box-shadow: none; min-width: 0; }
+.lab .tile .hear {
+  flex: 1; text-align: left; padding: 11px 10px; font-size: 11.5px; text-transform: none;
+  letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lab .tile .put {
+  flex: none; padding: 11px 12px; font-size: 9.5px; letter-spacing: 0.14em;
+  background: #0d0a18; color: #fdfbf2;
+}
+.lab .tile .put:hover { background: #ff1f7a; }
+.lab .tile.on .put { background: #c6ff2e; color: #0d0a18; }
+.lab .tile button:active { transform: none; }
+
+/* the strip showing what the selected cue currently plays */
+.lab .cuebar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 16px;
+  padding: 12px 14px; background: rgba(253, 251, 242, 0.06); border-left: 4px solid #c6ff2e;
+}
+.lab .cuebar > b { font: 900 13px "Zen Kaku Gothic New", sans-serif; text-transform: uppercase; letter-spacing: 0.08em; }
+.lab .cuebar .path { font: 500 12px "M PLUS 1 Code", monospace; color: #a99cc4; }
+.lab .cuebar .lvl { display: flex; align-items: center; gap: 9px; font: 700 10px "Zen Kaku Gothic New", sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #8f85a8; }
+.lab .cuebar .lvl input { width: 150px; }
+.lab .cuebar .lvl b { font-family: "M PLUS 1 Code", monospace; color: #c6ff2e; }
+.lab .cuebar .tagged { font: 700 9px "M PLUS 1 Code", monospace; font-style: normal; letter-spacing: 0.2em; color: #c6ff2e; text-transform: uppercase; }
+/* a dot marks the shelves suggested for the cue you are assigning */
+.lab .tabs button .dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: #ff1f7a; margin-left: 7px; vertical-align: 1px;
+}
+
+/* the assignment table */
+.lab table.assign { width: 100%; border-collapse: collapse; margin-top: 14px; }
+.lab table.assign th {
+  text-align: left; font: 900 11.5px "Zen Kaku Gothic New", sans-serif;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 7px 12px 7px 0; white-space: nowrap;
+}
+.lab table.assign td { padding: 5px 10px 5px 0; vertical-align: middle; }
+.lab table.assign td.file, .lab table.assign td.preset {
+  font: 700 8.5px "M PLUS 1 Code", monospace; letter-spacing: 0.18em; text-transform: uppercase;
+}
+.lab table.assign td.file { color: #6ee38f; }
+.lab table.assign td.preset { color: #c9a24a; }
+.lab table.assign td.note { font-size: 11px; color: #8f85a8; line-height: 1.5; max-width: 34ch; }
+.lab select {
+  font: 600 12px "Zen Kaku Gothic New", sans-serif; padding: 7px 9px; min-width: 190px;
+  background: #fdfbf2; color: #0d0a18; border: 2px solid #0d0a18;
+}
+.lab button.mini { min-width: 0; padding: 6px 11px; font-size: 10.5px; box-shadow: 2px 2px 0 #0d0a18; }
+
+/* the source tag: which cues are your own recordings and which are still built live */
+.lab button em {
+  display: block;
+  margin-top: 3px;
+  font: 700 8.5px/1 "M PLUS 1 Code", monospace;
+  font-style: normal;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.lab button em.file { color: #1a7a3c; }
+.lab button em.synth { color: #a4491f; }
+.lab button.on em.file, .lab button.on em.synth { color: rgba(255, 255, 255, 0.85); }
+.lab .hint { margin-top: 16px; font-size: 12.5px; line-height: 1.7; color: #8f85a8; max-width: 66ch; }
+.lab .hint b { color: #fdfbf2; }
+.lab .vol button { min-width: 0; padding: 8px 14px; font-size: 11px; margin-left: 8px; }

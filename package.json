@@ -1,0 +1,37 @@
+{
+  "name": "chain-gammon",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Chain Gammon — on-chain PvP backgammon match play with a real doubling cube. 1v1, race to the match target, winner takes the pot, no house.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:contracts": "solc --optimize --bin --abi -o contracts/out contracts/src/Backgammon.sol",
+    "build:platform": "cross-env VITE_DEMO_BOT=0 vite build"
+  },
+  "dependencies": {
+    "penpal": "^7.0.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@ethereumjs/common": "^10.1.2",
+    "@ethereumjs/evm": "^10.1.2",
+    "@ethereumjs/statemanager": "^10.1.2",
+    "@ethereumjs/util": "^10.1.2",
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
+  }
+}
