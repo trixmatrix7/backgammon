@@ -29,8 +29,8 @@ npx vercel link && npx vercel --prod
 ```
 
 Vercel reads `vercel.json`, so there is nothing to configure in the dashboard: it runs
-`npm run build:platform`, serves `dist`, and rewrites unknown paths to `index.html` so a
-deep link does not 404.
+`npm run build`, serves `dist`, and rewrites unknown paths to `index.html` so a deep link
+does not 404.
 
 Linking the GitHub repository in the Vercel dashboard instead gives you a deploy on every
 push, which is worth doing once the repository exists.
