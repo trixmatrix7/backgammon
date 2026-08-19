@@ -59,15 +59,24 @@
 html,
 body,
 #root {
-  height: auto;
+  height: 100%;
   min-height: 0;
 }
+/* The table fills the window; `place-items: center` here was left over from a
+   letterboxing attempt and stopped the shell from stretching. */
 body { overflow: hidden; }
 .shell {
   position: relative;
+  /* The table fills the window and lays itself out with container queries, so it adapts
+     to whatever shape the window is. It used to be pinned to 16:9 by WIDTH alone —
+     `width: 100%` plus `aspect-ratio: 16/9` — which meant a window flatter than 16:9 got
+     a stage TALLER than itself and the dock, the dice and the roll button fell off the
+     bottom edge. (The aspect-ratio was in fact already dead: theme.css sets
+     `height: 100%` later in the cascade and won. It only ever worked inside a host frame
+     that happened to be 16:9.) */
   width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
+  height: 100%;
+  overflow: hidden;
 }
 
 .neo,
@@ -1439,21 +1448,28 @@ body { overflow: hidden; }
    stability was hard enough won. */
 
 .demo-banner {
-  position: fixed;
+  /* The banner does not overlay the table, it takes a strip off the top of it (see
+     `.shell.demo .neo`). Overlaying has no safe home: every element on the table is
+     sized in container units and grows with the window, so a fixed-height bar parked at
+     either edge clipped something — the roll button at the bottom, the pot at the top.
+     Reserving 34px instead costs a sliver of table and collides with nothing, and since
+     the strip is there for the whole demo session the layout never shifts underneath. */
+  position: absolute;
   left: 50%;
-  bottom: 0;
+  top: 0;
   transform: translateX(-50%);
   z-index: 9999;
   pointer-events: none;
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 10px;
-  padding: 7px 18px;
+  height: 34px;
+  padding: 0 18px;
   background: var(--hot);
   color: var(--paper);
-  border: 2px solid var(--ink);
-  border-bottom: 0;
-  box-shadow: 0 -3px 0 rgba(13, 10, 24, 0.55);
+  border: 0;
+  border-bottom: 2px solid var(--ink);
   font-family: var(--ui);
   white-space: nowrap;
 }
@@ -1468,4 +1484,14 @@ body { overflow: hidden; }
 }
 @media (max-width: 560px) {
   .demo-banner span { display: none; }
+}
+
+/* The strip the demo banner occupies, taken off the table rather than laid over it. */
+.shell.demo .neo {
+  top: 34px;
+}
+.shell.demo .demo-banner {
+  left: 0;
+  right: 0;
+  transform: none;
 }

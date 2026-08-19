@@ -107,7 +107,7 @@ export function App() {
   }
 
   return (
-    <div className="shell">
+    <div className={`shell${debug?.active ? " demo" : ""}`}>
       {screen}
       {debug?.active && <DemoBanner />}
       {notice && <div className="toast">{notice}</div>}

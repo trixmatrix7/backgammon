@@ -9,3 +9,6 @@ contracts/lib
 
 # Vercel
 .vercel
+
+.vercel
+.env*
