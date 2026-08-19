@@ -813,7 +813,11 @@ export function MatchScreen({
         <IntroSheet
           cubeOn={view.cubeOn}
           matchTo={view.matchTo}
-          onClose={() => {
+          // Closing it closes it for THIS match. It comes back at the next one, because
+          // the board is the thing a new player cannot read and one look at it is rarely
+          // enough. Suppressing it for good is a separate, deliberate click.
+          onClose={() => setIntroOpen(false)}
+          onNeverAgain={() => {
             setIntroOpen(false);
             try {
               localStorage.setItem(INTRO_KEY, "1");

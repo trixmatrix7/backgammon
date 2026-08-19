@@ -46,6 +46,13 @@ export function CreateTable({
   const [err, setErr] = useState<string | null>(null);
 
   const balNum = Number(formatUnits(BigInt(snapshot.balances.smartVaultBalance ?? "0"), decimals));
+  // The protocol's cut, straight from the host. It is a facet-level setting, not
+  // something this game chooses — so it is read and shown, never assumed.
+  const feeBps = snapshot.protocol?.feeBps ?? 0;
+  const feePct = `${(feeBps / 100).toFixed(feeBps % 100 === 0 ? 0 : 1)}%`;
+  const netPot = (einsatz * 2 * (1 - feeBps / 10000)).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  });
   // Two shapes only, because those are the two the platform offers: a single game, or
   // a short match. "Best of 3" is played as a match to 3 POINTS rather than to two
   // games won — that is how backgammon counts, and it is what keeps gammons meaning
@@ -245,7 +252,17 @@ export function CreateTable({
         </div>
       </div>
 
-      <p className="neo-foot">Both players pay the same stake into the pot. The winner takes all of it.</p>
+      <p className="neo-foot">
+        Both players pay the same stake into the pot.{" "}
+        {feeBps > 0 ? (
+          <>
+            The winner takes it minus the {feePct} protocol fee — <b className="mono">{netPot}</b>{" "}
+            <Coin /> on this table.
+          </>
+        ) : (
+          "The winner takes all of it."
+        )}
+      </p>
     </div>
   );
 }

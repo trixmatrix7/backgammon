@@ -20,14 +20,22 @@ export function IntroSheet({
   cubeOn,
   matchTo,
   onClose,
+  onNeverAgain,
 }: {
   cubeOn: boolean;
   matchTo: number;
+  /** Close it for this match. It opens again at the next one. */
   onClose: () => void;
+  /** Close it and never open it again. */
+  onNeverAgain: () => void;
 }) {
   const close = () => {
     Sound.play("click");
     onClose();
+  };
+  const never = () => {
+    Sound.play("click");
+    onNeverAgain();
   };
 
   return (
@@ -98,7 +106,9 @@ export function IntroSheet({
         </ol>
 
         <div className="intro-foot">
-          <span className="intro-hint">The full rules stay under RULES, any time.</span>
+          <button className="intro-never" onClick={never}>
+            Don't show this again
+          </button>
           <button className="neo-btn" onClick={close}>
             <span>Got it — let me play</span>
           </button>
