@@ -11,7 +11,7 @@ const RULES: Array<{ t: string; d: string }> = [
   },
   {
     t: "A turn",
-    d: "You throw two dice, and each number is its own move: a 5 means go five points on. Split them across two checkers or play both with one, but then one after the other, and the halfway point has to be open. Doubles count four times: on 3·3 you make four moves of 3. You must play both numbers if there is any way to. If only one will go, it has to be the higher. If nothing goes, your turn is over. When a throw leaves exactly one legal way to play, this table plays it out for you and says so — but nothing is sent until you confirm, and undo takes it back.",
+    d: "You throw two dice, and each number is its own move: a 5 means go five points on. Split them across two checkers or play both with one, but then one after the other, and the halfway point has to be open. Doubles count four times: on 3·3 you make four moves of 3. You must play both numbers if there is any way to. If only one will go, it has to be the higher. If nothing goes, your turn is over. When a throw leaves exactly one legal way to play, this table plays it out for you and says so — but nothing is sent to the chain until you confirm.",
   },
   {
     t: "Where you may land",

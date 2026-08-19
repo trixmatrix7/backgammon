@@ -70,8 +70,9 @@ export function IntroSheet({
           <li>
             <b>You must use as many dice as you can.</b> This is not optional, and it is why the
             board sometimes moves without you: when a throw leaves exactly one legal way to play, the
-            table plays it out for you and tells you it did. Nothing is sent until you press{" "}
-            <b>CONFIRM</b>, and <b>UNDO</b> takes it back.
+            table plays it out for you and tells you it did. Nothing is sent to the chain until you
+            press <b>CONFIRM</b> — so read the board before you do, because a placed checker stays
+            placed.
           </li>
           <li>
             <b>Two checkers hold a point.</b> A point with two or more of your checkers is closed to

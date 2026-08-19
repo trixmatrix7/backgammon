@@ -255,7 +255,8 @@ export function MatchScreen({
       // Say it. A checker that moves on its own, with no click behind it, reads as a
       // bug — and the rule underneath ("you must use as many dice as you can") is one
       // of the two rules new players never guess. So the callout names both the fact
-      // and the reason, and CONFIRM still belongs to the player.
+      // and the reason. CONFIRM still belongs to the player: the turn is staged, not
+      // sent.
       setForced(Date.now());
     }, 420);
     return () => {
@@ -456,16 +457,6 @@ export function MatchScreen({
     if (dest === OFF || dest >= 0) stage({ from: selected, die: dieValue });
   };
 
-  const undo = () => {
-    if (pending.length === 0) return;
-    Sound.play("lift");
-    autoRef.current = view.seq; // don't immediately re-stage the forced turn we just took apart
-    if (flyTimer.current) clearTimeout(flyTimer.current);
-    setLocalFly(null);
-    setPending(pending.slice(0, -1));
-    setSelected(null);
-  };
-
   const confirmMove = () => {
     if (!turnComplete) return;
     myMoveSeqRef.current = view.seq + 1;
@@ -658,11 +649,6 @@ export function MatchScreen({
           {inGameOver && (
             <button className="neo-go" onClick={() => submit(NEXT)}>
               <span>Next</span>
-            </button>
-          )}
-          {inMove && pending.length > 0 && (
-            <button className="neo-tok live" title="Take the last step back" onClick={undo}>
-              ↺
             </button>
           )}
         </div>
