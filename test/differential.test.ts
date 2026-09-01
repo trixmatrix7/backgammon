@@ -30,7 +30,7 @@ import {
   legalTurns,
   type GameState,
 } from "../src/engine/index.js";
-import { encodeAction, encodeState } from "../src/game/codec.js";
+import { decodeState, encodeAction, encodeState } from "../src/game/codec.js";
 import { deployBackgammon, type Deployed } from "./evm";
 
 const A = `0x${"aa".repeat(20)}` as const;
@@ -88,9 +88,14 @@ function blankDeadline(encoded: Hex): Hex {
   // Every member of the tuple is a static type, so the tuple itself is static and there
   // is NO offset word in front of it — `deadline` is word 14 counting from zero:
   // numPlayers, matchTo, current, phase, cube, cubeOwner, cubeOn, officialOpening,
-  // gameIndex, turnIndex, seq, winner, over, seed, deadline.
+  // gameIndex, turnIndex, seq, winner, over, seed, deadline, reserve[0], reserve[1].
+  //
+  // The reserve is blanked for the same reason as the deadline: both are the contract's
+  // clock, and the engine has no notion of time at all.
   const words = (encoded.slice(2).match(/.{64}/g) ?? []).slice();
   words[14] = "0".repeat(64);
+  words[15] = "0".repeat(64);
+  words[16] = "0".repeat(64);
   return `0x${words.join("")}` as Hex;
 }
 
@@ -99,6 +104,7 @@ const FIELDS: string[] = (() => {
   const f = [
     "numPlayers", "matchTo", "current", "phase", "cube", "cubeOwner", "cubeOn",
     "officialOpening", "gameIndex", "turnIndex", "seq", "winner", "over", "seed", "deadline",
+    "reserve[0]", "reserve[1]",
   ];
   for (let i = 0; i < 24; i++) f.push(`point[${i}]`);
   f.push("bar[0]", "bar[1]", "off[0]", "off[1]", "score[0]", "score[1]", "dice[0]", "dice[1]");
@@ -476,6 +482,58 @@ describe("engine ⇄ contract", () => {
         await bg.call("onPlayerAction", [ctxOf(config, dealt), stranger, skip], late),
       );
       expect(byStranger.recipients[0].toLowerCase()).toBe(idle.toLowerCase());
+    }, 600000);
+
+    /**
+     * The reserve.
+     *
+     * A 45-second turn clock on its own punishes the wrong person: a player sitting right
+     * there, thinking about a doubles turn, loses the match to someone who only had to
+     * wait. The reserve is what separates "thinking" from "gone" — it is spent only by the
+     * part of a turn that overruns the bank, and only when it is empty does the clock
+     * actually run out.
+     */
+    it("spends the reserve on a long think, and only then runs out", async () => {
+      bg = bg ?? (await deployBackgammon());
+      const TURN = 60n;
+      const config = CONFIG(Number(TURN), 3, false, false);
+      const word = wordAt(920, 0);
+
+      const dealt = asStep(await bg.call("onRandomness", [ctxOf(config, "0x"), word])).newGameState;
+      const engine = createInitialState(word, 2, 3, false, false);
+      const opener = engine.current === 0 ? A : B;
+      const idle = engine.current === 0 ? B : A;
+
+      const start = decodeState(dealt);
+      expect(start.reserve, "both sides open with a full reserve").toEqual([120, 120]);
+      // The deadline already contains the reserve: bank + reserve from a zero block clock.
+      expect(start.deadline).toBe(Number(TURN) + 120);
+
+      // Forty seconds past the bank — well inside the reserve, so no claim yet.
+      await expect(
+        bg.call("onPlayerAction", [ctxOf(config, dealt), idle, encodeAction(7)], 100n),
+        "a long think is not an abandoned match",
+      ).rejects.toThrow();
+
+      // Play the turn at that same moment; the overrun comes out of the reserve.
+      const pick = legalTurns(engine)[0];
+      const after = asStep(
+        await bg.call(
+          "onPlayerAction",
+          [ctxOf(config, dealt), opener, encodeAction(ACTION_MOVE, pick)],
+          100n,
+        ),
+      ).newGameState;
+      const spent = decodeState(after);
+      expect(spent.reserve[engine.current], "40s over the bank costs 40s of reserve").toBe(80);
+      expect(spent.reserve[engine.current ^ 1], "the other side is untouched").toBe(120);
+
+      // Past bank AND reserve, the match really is abandoned.
+      const claimed = asStep(
+        await bg.call("onPlayerAction", [ctxOf(config, dealt), idle, encodeAction(7)], 181n),
+      );
+      expect(claimed.nextPhase, "bank and reserve both gone").toBe(5);
+      expect(claimed.recipients[0].toLowerCase()).toBe(idle.toLowerCase());
     }, 600000);
   });
 });

@@ -47,6 +47,11 @@ export const STATE_TUPLE = [
       { name: "over", type: "bool" },
       { name: "seed", type: "bytes32" },
       { name: "deadline", type: "uint64" },
+      // Seconds of thinking time each side still has in hand beyond the per-turn bank.
+      // Neither this nor `deadline` is part of the engine's state — the engine knows
+      // nothing about time. Both belong to the contract and are carried here so the
+      // client can show them.
+      { name: "reserve", type: "uint16[2]" },
       { name: "points", type: "int8[24]" }, // + = seat 0 checkers, − = seat 1 checkers
       { name: "bar", type: "uint8[2]" },
       { name: "off", type: "uint8[2]" },
@@ -87,7 +92,11 @@ export const STATE_TUPLE = [
 
 const pad4 = (xs: number[]): [number, number, number, number] => [xs[0] ?? 0, xs[1] ?? 0, xs[2] ?? 0, xs[3] ?? 0];
 
-export function encodeState(s: GameState, deadlineSec: number): Hex {
+export function encodeState(
+  s: GameState,
+  deadlineSec: number,
+  reserve: [number, number] = [0, 0],
+): Hex {
   const e = s.lastEvent;
   const r = s.lastResult;
   return encodeAbiParameters(STATE_TUPLE, [
@@ -107,6 +116,7 @@ export function encodeState(s: GameState, deadlineSec: number): Hex {
       over: s.over,
       seed: s.seed,
       deadline: BigInt(deadlineSec),
+      reserve,
       points: s.points,
       bar: s.bar,
       off: s.off,
@@ -155,6 +165,7 @@ interface WireTuple {
   over: boolean;
   seed: Hex;
   deadline: bigint;
+  reserve: readonly Num[];
   points: readonly Num[];
   bar: readonly Num[];
   off: readonly Num[];
@@ -183,7 +194,12 @@ interface WireTuple {
   };
 }
 
-export function decodeState(data: Hex): { state: GameState; deadline: number } {
+export function decodeState(data: Hex): {
+  state: GameState;
+  deadline: number;
+  /** Seconds of reserve left, per seat. */
+  reserve: [number, number];
+} {
   const [t] = decodeAbiParameters(STATE_TUPLE, data) as unknown as [WireTuple];
 
   const ev = t.lastEvent;
@@ -240,6 +256,7 @@ export function decodeState(data: Hex): { state: GameState; deadline: number } {
       lastResult,
     },
     deadline: Number(t.deadline),
+    reserve: [Number(t.reserve?.[0] ?? 0), Number(t.reserve?.[1] ?? 0)],
   };
 }
 

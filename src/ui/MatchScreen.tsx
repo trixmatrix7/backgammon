@@ -64,6 +64,9 @@ export function MatchScreen({
   const decoded = useMemo(() => decodeState(lobby.raw.gameState!), [lobby.raw.gameState]);
   const auth = decoded.state;
   const deadline = decoded.deadline;
+  // The contract's clock, not the engine's — the engine has no notion of time. `reserve`
+  // is what is left of each side's match allowance; the deadline already includes it.
+  const reserve = decoded.reserve;
 
   const { view, anim, animating } = useMatchAnimator(auth);
   // V2: the roster is fetched, not carried on the lobby. Entry order IS seat order —
@@ -602,6 +605,7 @@ export function MatchScreen({
             score={view.score[seat]}
             matchTo={view.matchTo}
             secondsLeft={seat === view.current && !over ? remaining : null}
+            inReserve={seat === view.current && remaining <= reserve[seat]}
             holdsCube={view.cubeOwner === seat}
             cube={view.cube}
           />

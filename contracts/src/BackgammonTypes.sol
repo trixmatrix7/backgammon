@@ -102,6 +102,10 @@ library BG {
     bool over;
     bytes32 seed;
     uint64 deadline;
+    /// @dev Seconds of thinking time each side still holds beyond the per-turn bank.
+    ///      A short turn clock keeps the game moving; the reserve means one long think —
+    ///      or one distracted minute — does not cost you the match.
+    uint16[2] reserve;
     /// @dev Absolute 24-slot board. Positive = seat 0's checkers, negative = seat 1's.
     ///      Seat 0 travels 23 → 0; seat 1 travels 0 → 23.
     int8[24] points;

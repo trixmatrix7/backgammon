@@ -1528,3 +1528,15 @@ body { overflow: hidden; }
   text-underline-offset: 0.25cqw;
 }
 .intro-never:hover { color: var(--hot); }
+
+/* The clock, when it starts to matter. A bare number gave a player no warning that the
+   match was about to end on time — the one failure that feels like the game cheating. */
+.neo-card .ft.warn b { color: var(--hot); }
+.neo-card .ft.urgent b {
+  color: var(--hot);
+  animation: neo-tick 1s steps(2, end) infinite;
+}
+@keyframes neo-tick {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.35; }
+}

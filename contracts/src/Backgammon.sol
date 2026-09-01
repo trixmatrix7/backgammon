@@ -54,6 +54,11 @@ contract Backgammon is IPvpGameV2 {
   uint16 internal constant MIN_TURN_SEC = 15;
   uint16 internal constant MAX_TURN_SEC = 600;
   uint256 internal constant SEATS = 2;
+  /// @dev Thinking time each side gets for the WHOLE match, on top of the per-turn bank.
+  ///      The per-turn clock is short so an abandoned match cannot freeze the pot for
+  ///      long; the reserve is what stops that short clock from punishing a player who is
+  ///      sitting right there, thinking. It is spent only when a turn overruns.
+  uint16 internal constant RESERVE_SEC = 120;
   uint256 internal constant BPS = 10_000;
 
   // ── lobby lifecycle ─────────────────────────────────────────────────────────
@@ -206,6 +211,7 @@ contract Backgammon is IPvpGameV2 {
 
     BG.Action memory a = _action(actionData);
     uint8 seat = _seatOf(ctx, player);
+    uint8 acting = s.current;
 
     // ── the permissionless timeout path ──────────────────────────────────────
     // Anyone may send this once the deadline has passed, including a keeper. Without
@@ -242,11 +248,11 @@ contract Backgammon is IPvpGameV2 {
       return r;
     }
 
-    if (a.kind == BG.ACTION_MOVE) return _step(_move(s, a), cfg, ctx);
-    if (a.kind == BG.ACTION_DOUBLE) return _step(_double(s), cfg, ctx);
-    if (a.kind == BG.ACTION_TAKE) return _step(_take(s), cfg, ctx);
-    if (a.kind == BG.ACTION_PASS) return _step(_pass(s), cfg, ctx);
-    if (a.kind == BG.ACTION_RESIGN) return _step(_resign(s), cfg, ctx);
+    if (a.kind == BG.ACTION_MOVE) return _step(_spend(_move(s, a), cfg, acting), cfg, ctx);
+    if (a.kind == BG.ACTION_DOUBLE) return _step(_spend(_double(s), cfg, acting), cfg, ctx);
+    if (a.kind == BG.ACTION_TAKE) return _step(_spend(_take(s), cfg, acting), cfg, ctx);
+    if (a.kind == BG.ACTION_PASS) return _step(_spend(_pass(s), cfg, acting), cfg, ctx);
+    if (a.kind == BG.ACTION_RESIGN) return _step(_spend(_resign(s), cfg, acting), cfg, ctx);
 
     revert UnknownAction();
   }
@@ -273,6 +279,7 @@ contract Backgammon is IPvpGameV2 {
     s.gameIndex = gameIndex;
     s.winner = -1;
     s.cubeOwner = -1;
+    s.reserve = [RESERVE_SEC, RESERVE_SEC];
 
     // The "official" table rule: every tied opening throw doubles the game value before
     // the re-throw. Off by default, and capped so a freak run cannot overflow the cube.
@@ -605,6 +612,8 @@ contract Backgammon is IPvpGameV2 {
   ///      result all carry over untouched.
   function _dealNext(BG.State memory s, bytes32 word) internal pure returns (BG.State memory) {
     s.seq += 1;
+    // The reserve is a MATCH allowance and deliberately not refilled between games:
+    // refilling it would hand a stalling player a fresh two minutes every game.
 
     s.points = R.openingPosition();
     s.bar = [uint8(0), uint8(0)];
@@ -646,6 +655,25 @@ contract Backgammon is IPvpGameV2 {
 
   // ── plumbing ────────────────────────────────────────────────────────────────
 
+  /// @dev Charge a player for the part of their turn that ran past the per-turn bank.
+  /// @dev The turn started at `deadline - turnSec - reserve`, because that is how `_step`
+  ///      stamped it and the reserve has not moved since. So the overrun is whatever the
+  ///      clock reads past `deadline - reserve`, and it comes out of the reserve.
+  function _spend(
+    BG.State memory s,
+    BG.Config memory cfg,
+    uint8 acting
+  ) internal view returns (BG.State memory) {
+    uint256 held = s.reserve[acting];
+    if (held == 0 || s.deadline == 0) return s;
+    uint256 bankRanOutAt = uint256(s.deadline) - held;
+    if (block.timestamp <= bankRanOutAt) return s;
+    uint256 overrun = block.timestamp - bankRanOutAt;
+    s.reserve[acting] = uint16(overrun >= held ? 0 : held - overrun);
+    cfg;
+    return s;
+  }
+
   /// @dev Wrap a step: stamp the turn deadline and either continue or resolve.
   function _step(
     BG.State memory s,
@@ -656,7 +684,12 @@ contract Backgammon is IPvpGameV2 {
 
     // The one place a timestamp is read. Everything else must stay deterministic for a
     // given context, because the facet may replay `onLobbyStart` as a simulation.
-    s.deadline = uint64(block.timestamp) + cfg.turnSec;
+    //
+    // The deadline is the real drop-dead time: turn bank PLUS whatever reserve the player
+    // still holds. That is what makes one field do both jobs — the claim check stays a
+    // plain `block.timestamp > deadline`, and it now means "their bank and their reserve
+    // are both gone" rather than "they thought for longer than 45 seconds".
+    s.deadline = uint64(block.timestamp) + cfg.turnSec + s.reserve[s.current];
     r.newGameState = abi.encode(s);
     r.nextPhase = LobbyPhase.WAITING_PLAYER_ACTION;
   }

@@ -26,6 +26,7 @@ export function PlayerCard({
   score,
   matchTo,
   secondsLeft,
+  inReserve,
   holdsCube,
   cube,
 }: {
@@ -38,6 +39,8 @@ export function PlayerCard({
   score: number;
   matchTo: number;
   secondsLeft: number | null;
+  /** True once the per-turn bank is gone and the match reserve is paying for the turn. */
+  inReserve: boolean;
   holdsCube: boolean;
   cube: number;
 }) {
@@ -76,8 +79,12 @@ export function PlayerCard({
           </b>
         </div>
         {secondsLeft !== null && (
-          <div className="ft">
-            <span>Clock</span>
+          // The clock says what is about to happen. It used to be a bare number, which
+          // meant a player sitting right there, thinking, could lose the match with no
+          // signal at all that it was coming. Below a minute it turns; below fifteen
+          // seconds it beats.
+          <div className={`ft${secondsLeft <= 60 ? " warn" : ""}${secondsLeft <= 15 ? " urgent" : ""}`}>
+            <span>{inReserve ? "Reserve" : "Clock"}</span>
             <b className="num">{clock(secondsLeft)}</b>
           </div>
         )}

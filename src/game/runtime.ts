@@ -14,11 +14,16 @@ import {
   type Hex,
 } from "@engine";
 
+/** Matches `RESERVE_SEC` in `contracts/src/Backgammon.sol`. */
+export const RESERVE_SEC = 120;
+
 export interface MockMatch {
   matchTo: number;
   es: GameState;
   deadline: number; // ms epoch (client soft per-turn timer)
   turnMs: number; // configured per-turn time limit
+  /** Seconds of thinking time each seat still holds beyond the per-turn bank. */
+  reserve: [number, number];
   winner: number | null; // null = in progress; -1 = drawn match; else the winning seat
 }
 
@@ -33,8 +38,9 @@ export function startMatch(
   return {
     matchTo,
     es,
-    deadline: Date.now() + turnMs,
+    deadline: Date.now() + turnMs + RESERVE_SEC * 1000,
     turnMs,
+    reserve: [RESERVE_SEC, RESERVE_SEC],
     winner: es.over ? es.winner : null,
   };
 }
