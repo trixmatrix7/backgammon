@@ -309,6 +309,15 @@ export const TAKE = ACTION_TAKE;
 export const PASS = ACTION_PASS;
 export const RESIGN = ACTION_RESIGN;
 export const NEXT = ACTION_NEXT;
+/**
+ * Claim a match whose opponent stopped playing.
+ *
+ * Not one of the engine's actions — there is no such move in backgammon. It exists only
+ * on chain, where the contract writes a deadline into the state on every hand-over and
+ * accepts this from ANY caller once that deadline has passed. Whoever was on the clock
+ * forfeits. Without it a player who closes the tab freezes the pot for both of them.
+ */
+export const SKIP = 7;
 
 // ── lobby config ──────────────────────────────────────────────────────────────
 

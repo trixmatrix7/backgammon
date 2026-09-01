@@ -434,5 +434,48 @@ describe("engine ⇄ contract", () => {
       void engine;
       void chain;
     }, 600000);
+
+    /**
+     * The rage quit.
+     *
+     * A player who closes the tab must not be able to freeze the pot for the other one.
+     * The contract writes a deadline on every hand-over and lets ANY caller claim the
+     * match once it passes — which is also why the check below is on the clock and not
+     * on who is asking.
+     */
+    it("lets the abandoned player claim the match once the clock runs out", async () => {
+      bg = bg ?? (await deployBackgammon());
+      const config = CONFIG(60, 3, false, false);
+      const word = wordAt(910, 0);
+      const dealt = asStep(await bg.call("onRandomness", [ctxOf(config, "0x"), word])).newGameState;
+      const engine = createInitialState(word, 2, 3, false, false);
+      const onRoll = engine.current;
+      const idle = onRoll === 0 ? B : A;
+      const skip = encodeAction(7 /* SKIP */);
+
+      // The deadline was stamped from the block clock, so nothing has expired yet.
+      await expect(
+        bg.call("onPlayerAction", [ctxOf(config, dealt), idle, skip]),
+        "cannot be claimed before the clock runs out",
+      ).rejects.toThrow();
+
+      // Well past it. The turn bank is 60s and the deal stamped it at timestamp 0.
+      const late = 10_000n;
+      const claimed = asStep(await bg.call("onPlayerAction", [ctxOf(config, dealt), idle, skip], late));
+      expect(claimed.nextPhase, "the match resolves").toBe(5);
+      expect(claimed.recipients.length, "one winner, paid outright").toBe(1);
+      expect(
+        claimed.recipients[0].toLowerCase(),
+        "the pot goes to whoever did NOT run out of time",
+      ).toBe(idle.toLowerCase());
+
+      // And a stranger may do it too: the point is to keep the pot moving, not to
+      // reward whoever is watching.
+      const stranger = `0x${"cd".repeat(20)}` as Hex;
+      const byStranger = asStep(
+        await bg.call("onPlayerAction", [ctxOf(config, dealt), stranger, skip], late),
+      );
+      expect(byStranger.recipients[0].toLowerCase()).toBe(idle.toLowerCase());
+    }, 600000);
   });
 });

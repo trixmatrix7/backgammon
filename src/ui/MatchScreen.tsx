@@ -31,7 +31,7 @@ import {
   winProbability,
   type TurnMove,
 } from "@engine";
-import { DOUBLE, MOVE, NEXT, PASS, RESIGN, ROLL, TAKE, decodeState, encodeAction } from "../game/codec";
+import { DOUBLE, MOVE, NEXT, PASS, RESIGN, ROLL, SKIP, TAKE, decodeState, encodeAction } from "../game/codec";
 import { moveDuration } from "../game/pacing";
 import { Sound } from "../sound/sounds";
 import { Board, type Flight } from "./Board";
@@ -551,7 +551,26 @@ export function MatchScreen({
                     : null;
 
   /** The one action, and what it says. Exactly one primary on screen at a time. */
-  const cta = !yourTurn || over
+  /**
+   * The opponent is on the clock and it has run out.
+   *
+   * On chain the deadline is real and the contract enforces it: once it passes, ANY
+   * caller may claim the match for the other side. Until now nothing in this client ever
+   * sent that, so somebody whose opponent closed the tab watched a dead clock with no way
+   * to end the match. This is that way.
+   */
+  const foeAbandoned = seated && !over && !yourTurn && !animating && remaining <= 0;
+
+  const cta = foeAbandoned
+    ? {
+        label: "Claim the win",
+        on: () => {
+          Sound.play("click");
+          submit(SKIP);
+        },
+        ready: !acting,
+      }
+    : !yourTurn || over
     ? null
     : view.phase === PHASE_ROLL
       ? { label: "Roll", on: () => { Sound.play("click"); submit(ROLL); }, ready: inRoll }

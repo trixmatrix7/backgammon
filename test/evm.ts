@@ -50,7 +50,8 @@ function statMtime(p: string): number {
 
 export interface Deployed {
   abi: Abi;
-  call: (fn: string, args: unknown[]) => Promise<unknown>;
+  /** `atTime` advances the block timestamp, which is the only clock the contract reads. */
+  call: (fn: string, args: unknown[], atTime?: bigint) => Promise<unknown>;
 }
 
 const CALLER = new Address(hexToBytes(`0x${"11".repeat(20)}`));
@@ -81,7 +82,7 @@ export async function deployBackgammon(): Promise<Deployed> {
 
   return {
     abi,
-    async call(fn: string, args: unknown[]) {
+    async call(fn: string, args: unknown[], atTime?: bigint) {
       const data = encodeFunctionData({ abi, functionName: fn, args } as never);
       // Sent FROM the ledger, because that is what the game will see as `msg.sender` in
       // production and what it queries for seats.
@@ -90,6 +91,9 @@ export async function deployBackgammon(): Promise<Deployed> {
         to: TARGET,
         data: hexToBytes(data),
         gasLimit: 500_000_000n,
+        ...(atTime === undefined
+          ? {}
+          : { block: { header: { number: 1n, timestamp: atTime, difficulty: 0n, prevRandao: new Uint8Array(32), gasLimit: 30_000_000n, baseFeePerGas: 0n, coinbase: LEDGER } } as never }),
       });
       const ret = `0x${Buffer.from(res.execResult.returnValue).toString("hex")}` as Hex;
       if (res.execResult.exceptionError) {

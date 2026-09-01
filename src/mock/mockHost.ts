@@ -8,16 +8,9 @@
 // would, and emits the same abi-encoded bytes. That makes it the working spec for GammonGame.sol.
 import type { Hex } from "viem";
 import type { PvpHostApiV2, PvpHostSnapshotV2, LobbySnapshot, LobbyPhaseName } from "@pvp-sdk";
-import {
-  PHASE_CUBE,
-  PHASE_GAME_OVER,
-  PHASE_MOVE,
-  PHASE_ROLL,
-  autoTurn,
-  type Action,
-} from "@engine";
+import { PHASE_CUBE, PHASE_GAME_OVER } from "@engine";
 import manifest from "../../public/game.manifest.json";
-import { encodeState, encodeConfig, decodeConfig, decodeAction, toEngineAction } from "../game/codec";
+import { SKIP, encodeState, encodeConfig, decodeConfig, decodeAction, toEngineAction } from "../game/codec";
 import { eventDuration, RESULT_MS, WIN_REVEAL_MS } from "../game/pacing";
 import { startMatch, step, botFor, type MockMatch } from "../game/runtime";
 
@@ -296,6 +289,15 @@ export class MockHost {
     if (!m || m.winner !== null) return;
     if (this.getPhase() !== "WAITING_PLAYER_ACTION") return;
     const { kind, moves } = decodeAction(actionData);
+
+    // Claiming a match whose opponent stopped playing. Not an engine action — it exists
+    // only in the contract, so the mock has to reproduce it, deadline check and all.
+    if (kind === SKIP) {
+      if (Date.now() <= m.deadline) return;
+      this.forfeit(m.es.current);
+      return;
+    }
+
     const action = toEngineAction(kind, moves);
     // NEXT may come from either seat; everything else has to be the human's own turn.
     if (action.type !== "next" && m.es.current !== HUMAN) return;
@@ -311,34 +313,29 @@ export class MockHost {
     this.loop();
   }
 
-  /** The action the host plays for a player who let their clock run out. Always legal, always
-   *  deterministic — the same rule a contract would apply. */
-  private timeoutAction(): Action {
-    const es = this.match!.es;
-    switch (es.phase) {
-      case PHASE_MOVE:
-        return { type: "move", moves: autoTurn(es) };
-      case PHASE_CUBE:
-        return { type: "pass" };
-      case PHASE_GAME_OVER:
-        return { type: "next" };
-      case PHASE_ROLL:
-      default:
-        return { type: "roll" };
-    }
-  }
-
+  /**
+   * The human let the clock run out.
+   *
+   * This used to play the turn FOR them, which was friendly and wrong: on chain nobody
+   * plays your checkers, the deadline simply passes and the opponent claims the match.
+   * A demo that teaches a rule the contract does not have is worse than no demo, so the
+   * bot claims it here exactly as a real opponent would.
+   */
   private humanTimeout() {
     const m = this.match;
     if (!m || m.winner !== null || m.es.current !== HUMAN) return;
-    const action = this.timeoutAction();
-    step(m, HUMAN, action, randSeed());
-    this.onNotice?.(
-      action.type === "pass"
-        ? "Time's up — the double was declined for you."
-        : "Time's up — your turn was played for you.",
-    );
-    this.loop();
+    this.onNotice?.("Time's up — your opponent claimed the match.");
+    this.forfeit(HUMAN);
+  }
+
+  /** End the match against whoever was on the clock. */
+  private forfeit(loser: number) {
+    const m = this.match;
+    if (!m || m.winner !== null) return;
+    if (this.matchTimer) clearTimeout(this.matchTimer);
+    m.es = { ...m.es, over: true, winner: loser === 0 ? 1 : 0, seq: m.es.seq + 1 };
+    m.winner = loser === 0 ? 1 : 0;
+    this.revealWin(this.loopToken);
   }
 
   /** Drive the match: wait on the human (soft per-turn clock), or play one bot action per tick. */
