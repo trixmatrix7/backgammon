@@ -1,0 +1,23 @@
+{
+  "name": "@chain/pvp-sdk",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./host": "./src/host.ts",
+    "./guest": "./src/guest.ts"
+  },
+  "scripts": {
+    "check": "vp check",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "penpal": "^7.0.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.4",
+    "typescript": "7.0.2"
+  }
+}

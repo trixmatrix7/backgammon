@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits } from "viem";
-import type { PvpHostApiV1, PvpHostSnapshotV1, LobbySnapshot } from "@pvp-sdk";
+import type { PvpHostApiV2, PvpHostSnapshotV2, LobbySnapshot } from "@pvp-sdk";
 import {
   BAR,
   EV_DANCE,
@@ -39,7 +39,8 @@ import { MoveMagazine } from "./MoveMagazine";
 import { PlayerCard } from "./PlayerCard";
 import { RulesSheet } from "./RulesModal";
 import { INTRO_KEY, IntroSheet } from "./IntroSheet";
-import { playerName } from "./names";
+import { playerName, viewerName } from "./names";
+import { useParticipants } from "../sdk/useParticipants";
 import { fmt } from "./format";
 import { useMatchAnimator } from "./useMatchAnimator";
 import { useSound } from "./useSound";
@@ -55,20 +56,28 @@ export function MatchScreen({
   snapshot,
   lobby,
 }: {
-  hostApi: PvpHostApiV1;
-  snapshot: PvpHostSnapshotV1;
+  hostApi: PvpHostApiV2;
+  snapshot: PvpHostSnapshotV2;
   lobby: LobbySnapshot;
 }) {
-  const decimals = snapshot.token.decimals ?? 6;
+  const decimals = lobby.asset.decimals ?? 6;
   const decoded = useMemo(() => decodeState(lobby.raw.gameState!), [lobby.raw.gameState]);
   const auth = decoded.state;
   const deadline = decoded.deadline;
 
   const { view, anim, animating } = useMatchAnimator(auth);
-  const yourSeat = Math.max(0, lobby.players.findIndex((p) => p.isYou));
-  const seated = lobby.players.some((p) => p.isYou);
+  // V2: the roster is fetched, not carried on the lobby. Entry order IS seat order —
+  // the same order the on-chain ledger reports, so seat 0 here is seat 0 there.
+  const seats = useParticipants(hostApi, lobby);
+  const yourSeat = Math.max(0, seats.findIndex((p) => p.isYou));
+  const seated = seats.some((p) => p.isYou);
   const flip = yourSeat === 1;
-  const names = useMemo(() => lobby.players.map(playerName), [lobby.players]);
+  // The host may name the viewer separately from their seat metadata, so your own card
+  // uses that when it is there.
+  const names = useMemo(
+    () => seats.map((p, i) => (i === yourSeat ? viewerName(snapshot, p) : playerName(p))),
+    [seats, yourSeat, snapshot],
+  );
 
   const { muted } = useSound();
   const [soundOpen, setSoundOpen] = useState(false);
@@ -490,7 +499,9 @@ export function MatchScreen({
         : null;
 
   const potNum = Number(formatUnits(BigInt(lobby.pot ?? "0"), decimals));
-  const stakeNum = Number(formatUnits(BigInt(lobby.buyIn ?? "0"), decimals));
+  // V2 has no per-lobby buy-in: stakes are per entry. Ours are equal by rule, so the
+  // viewer's own total is the stake.
+  const stakeNum = Number(formatUnits(BigInt(lobby.viewer?.totalStake ?? "0"), decimals));
   const nextCube = Math.min(MAX_CUBE, view.cube * 2);
   const cubeAllowed = canDouble(view, yourSeat);
 

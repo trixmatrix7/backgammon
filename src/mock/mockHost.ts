@@ -7,7 +7,7 @@
 // the same @engine reducer, hands every ROLL/NEXT a fresh randomness word exactly where the facet
 // would, and emits the same abi-encoded bytes. That makes it the working spec for GammonGame.sol.
 import type { Hex } from "viem";
-import type { PvpHostApiV1, PvpHostSnapshotV1, LobbySnapshot, LobbyPhaseName } from "@pvp-sdk";
+import type { PvpHostApiV2, PvpHostSnapshotV2, LobbySnapshot, LobbyPhaseName } from "@pvp-sdk";
 import {
   PHASE_CUBE,
   PHASE_GAME_OVER,
@@ -26,6 +26,7 @@ const YOU = pad(0x11);
 const BOT = pad(0x22); // fills the second seat at match start
 const FAKE = [pad(4), pad(5), pad(6), pad(7), pad(8), pad(9)]; // other "players" in the table browser
 const GAME = pad(0x6a11); // game contract address (mock)
+const TOKEN = pad(0x05dc); // the stake asset (mock USDC)
 const DECIMALS = 6;
 const FEE_BPS = 500; // 5%
 const HUMAN = 0;
@@ -47,7 +48,6 @@ const NAME: Record<string, string> = {
 const THINK_MS = 480; // a beat of "the opponent is deciding" before each bot action
 const SETUP_MS = 1600; // hold before the first turn so the intro plays
 const FILL_MS = 1800; // the challenger sits down this long after you open a table
-const AUTOSTART_MS = 1500; // after you join someone's table, the host starts it
 
 const ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const randCode = () => Array.from({ length: 4 }, () => ALPH[Math.floor(Math.random() * ALPH.length)]).join("");
@@ -69,7 +69,7 @@ interface LobbyRec {
 }
 
 export class MockHost {
-  private push: (s: PvpHostSnapshotV1) => void;
+  private push: (s: PvpHostSnapshotV2) => void;
   private onNotice?: (msg: string) => void;
   private lobbies: LobbyRec[] = [];
   private match: MockMatch | null = null;
@@ -82,7 +82,7 @@ export class MockHost {
   private balance = 1_000_000_000n; // 1,000 USDC
   private paidOut = false;
 
-  constructor(push: (s: PvpHostSnapshotV1) => void, onNotice?: (msg: string) => void) {
+  constructor(push: (s: PvpHostSnapshotV2) => void, onNotice?: (msg: string) => void) {
     this.push = push;
     this.onNotice = onNotice;
     this.ensureSeeds();
@@ -124,43 +124,41 @@ export class MockHost {
     return this.lobbies.find((l) => l.id === this.myLobbyId);
   }
 
-  api(): PvpHostApiV1 {
+  api(): PvpHostApiV2 {
     return {
-      createLobby: async ({ buyIn, config }) => {
+      // Opening a lobby escrows nothing in V2 — the creator enters it afterwards like
+      // anyone else, which is why `scheduleFill` waits for that first entry.
+      createLobby: async ({ config }) => {
         const cfg = decodeConfig(config);
         const rec: LobbyRec = {
           id: randCode(),
           creator: YOU,
-          buyIn,
+          buyIn: cfg.requiredStake.toString(),
           maxPlayers: 2,
           turnSec: cfg.turnSec,
           matchTo: cfg.matchTo,
           cubeOn: cfg.cubeOn,
           officialOpening: cfg.officialOpening,
-          players: [YOU],
+          players: [],
           phase: "WAITING_FOR_PLAYERS",
         };
         this.lobbies.unshift(rec);
         this.myLobbyId = rec.id;
-        this.scheduleFill();
         this.emit();
         return { lobbyId: rec.id, transactionHash: "0xmock" as Hex };
       },
-      joinLobby: async ({ lobbyId }) => {
+      enterLobby: async ({ lobbyId, stake }) => {
         const rec = this.find(lobbyId);
         if (rec && rec.phase === "WAITING_FOR_PLAYERS" && !rec.players.includes(YOU) && rec.players.length < 2) {
+          // The game's own rule, which the contract enforces on chain: every seat pays
+          // the same, and the amount is the one written into the table's config.
+          if (BigInt(stake) !== BigInt(rec.buyIn)) throw new Error("wrong stake");
           rec.players.push(YOU);
           this.myLobbyId = rec.id;
-          if (rec.creator !== YOU) {
-            this.lobbyTimer = setTimeout(() => this.start(rec.id), AUTOSTART_MS);
-          }
+          this.scheduleFill();
           this.emit();
         }
-        return { transactionHash: "0xmock" as Hex };
-      },
-      leaveLobby: async ({ lobbyId }) => {
-        this.leave(lobbyId);
-        return { transactionHash: "0xmock" as Hex };
+        return { contributionId: "0", transactionHash: "0xmock" as Hex };
       },
       startLobby: async ({ lobbyId }) => {
         this.start(lobbyId);
@@ -174,7 +172,49 @@ export class MockHost {
         this.leave(lobbyId);
         return { transactionHash: "0xmock" as Hex };
       },
+      claimWinnings: async ({ lobbyId }) => {
+        const rec = this.find(lobbyId);
+        const half = rec ? (this.distributable(rec) / 2n).toString() : "0";
+        return { recipient: YOU, amount: half, transactionHash: "0xmock" as Hex };
+      },
+      claimRefund: async ({ lobbyId }) => {
+        const rec = this.find(lobbyId);
+        return { amount: rec?.buyIn ?? "0", transactionHash: "0xmock" as Hex };
+      },
+      getLobbyParticipants: async ({ lobbyId }) => {
+        const rec = this.find(lobbyId);
+        return { items: (rec?.players ?? []).map((a) => this.participant(rec!, a)) };
+      },
+      getLobbyContributions: async ({ lobbyId }) => {
+        const rec = this.find(lobbyId);
+        return {
+          items: (rec?.players ?? []).map((participant, i) => ({
+            contributionId: String(i),
+            participant,
+            amount: rec!.buyIn,
+            positionId: `0x${participant.slice(2).padStart(64, "0")}` as Hex,
+            cumulativePot: (BigInt(rec!.buyIn) * BigInt(i + 1)).toString(),
+          })),
+        };
+      },
     };
+  }
+
+  /** One participant row, as the ledger would report it. */
+  private participant(rec: LobbyRec, address: string) {
+    return {
+      address: address as Hex,
+      totalStake: rec.buyIn,
+      contributionCount: 1,
+      isYou: address === YOU,
+      metadata: { username: NAME[address], displayName: NAME[address] },
+    };
+  }
+
+  /** The pot after the protocol's cut — what the game actually gets to hand out. */
+  private distributable(rec: LobbyRec): bigint {
+    const pot = BigInt(rec.buyIn) * BigInt(rec.players.length);
+    return pot - (pot * BigInt(FEE_BPS)) / 10000n;
   }
 
   private scheduleFill() {
@@ -387,60 +427,57 @@ export class MockHost {
 
   private lobbyToSnapshot(rec: LobbyRec): LobbySnapshot {
     const isActive = rec.id === this.activeId && !!this.match;
-    const pot = BigInt(rec.buyIn) * 2n;
-    let payout: LobbySnapshot["payout"];
+    const pot = BigInt(rec.buyIn) * BigInt(rec.players.length);
+    const fee = (pot * BigInt(FEE_BPS)) / 10000n;
+    const dist = pot - fee;
+
+    // V2 settles by RECIPIENT, and the protocol reads the mode off how many there are.
+    // One winner is paid straight out (IMMEDIATE); a level match leaves two shares to be
+    // collected (CLAIMABLE). There is no share table any more.
+    let settlement: LobbySnapshot["settlement"];
     if (rec.phase === "RESOLVED" && this.match && this.match.winner !== null) {
       const w = this.match.winner;
-      const fee = (pot * BigInt(FEE_BPS)) / 10000n;
-      const dist = pot - fee;
-      if (w === -1) {
-        const half = dist / 2n;
-        payout = {
-          players: rec.players,
-          shareBps: [5000, 5000],
-          amounts: [half.toString(), (dist - half).toString()],
-          feeAmount: fee.toString(),
-        };
-      } else {
-        payout = {
-          players: rec.players,
-          shareBps: rec.players.map((_, i) => (i === w ? 10000 : 0)),
-          amounts: rec.players.map((_, i) => (i === w ? dist.toString() : "0")),
-          feeAmount: fee.toString(),
-        };
-      }
+      settlement =
+        w === -1
+          ? { mode: "CLAIMABLE", feeAmount: fee.toString(), payoutRemaining: dist.toString() }
+          : {
+              mode: "IMMEDIATE",
+              feeAmount: fee.toString(),
+              immediate: { winner: rec.players[w] as Hex, amount: dist.toString() },
+            };
     }
+
+    const viewer = rec.players.includes(YOU) ? this.participant(rec, YOU) : undefined;
+
     return {
       lobbyId: rec.id,
       gameAddress: GAME,
-      creator: rec.creator,
+      opener: rec.creator as Hex,
+      asset: { address: TOKEN, symbol: "USDC", decimals: DECIMALS },
       phaseName: rec.phase,
-      buyIn: rec.buyIn,
       pot: pot.toString(),
+      participantCount: rec.players.length,
+      contributionCount: rec.players.length,
       protocolFeeBps: FEE_BPS,
-      maxPlayers: 2,
-      players: rec.players.map((address) => ({
-        address,
-        isYou: address === YOU,
-        metadata: { username: NAME[address], displayName: NAME[address] },
-      })),
+      viewer: viewer && { ...viewer, claimed: false },
       isResolved: rec.phase === "RESOLVED",
       lastEventTimestamp: Date.now(),
-      payout,
+      settlement,
       raw: {
-        config: encodeConfig(rec.turnSec, rec.matchTo, rec.cubeOn, rec.officialOpening),
+        config: encodeConfig(rec.turnSec, rec.matchTo, rec.cubeOn, rec.officialOpening, rec.buyIn),
         gameState: isActive ? encodeState(this.match!.es, Math.floor(this.match!.deadline / 1000)) : undefined,
       },
     };
   }
 
-  private snapshot(): PvpHostSnapshotV1 {
+  private snapshot(): PvpHostSnapshotV2 {
     return {
-      apiVersion: 1,
+      apiVersion: 2,
       integration: { chainId: 8453, slug: "gammon", gameAddress: GAME, manifest: manifest as never },
-      wallet: { address: YOU, smartVaultAddress: YOU, status: "ready" },
-      token: { symbol: "USDC", decimals: DECIMALS },
-      balances: { smartVaultBalance: this.balance.toString() },
+      wallet: { address: YOU, status: "ready" },
+      assets: [
+        { address: TOKEN, symbol: "USDC", decimals: DECIMALS, balance: this.balance.toString() },
+      ],
       protocol: { feeBps: FEE_BPS },
       metadata: { viewer: { displayName: "You" } },
       lobbies: { items: this.lobbies.map((l) => this.lobbyToSnapshot(l)) },

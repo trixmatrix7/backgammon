@@ -1,34 +1,26 @@
-// Vendored from @chain/pvp-sdk (src/guest.ts). Keep in sync with the registry.
 import { WindowMessenger, connect } from 'penpal';
 import type { Connection } from 'penpal';
-import type { PvpGuestApiV1, PvpHostApiV1 } from './types';
+import type { PvpGuestApiV2, PvpHostApiV2 } from './types';
 
 export type {
-  PvpGuestApiV1,
-  PvpHostApiV1,
-  PvpHostMetadataV1,
-  PvpHostSnapshotV1,
-  PvpLobbyMetadataV1,
+  PvpGuestApiV2,
+  PvpHostApiV2,
+  PvpHostMetadataV2,
+  PvpHostSnapshotV2,
+  PvpLobbyMetadataV2,
   PvpMetadataBag,
   PvpMetadataPrimitive,
   PvpMetadataValue,
-  PvpPlayerMetadataV1,
-  PvpRoomMetadataV1,
-  PvpRoomParticipantMetadataV1,
+  PvpPlayerMetadataV2,
+  PvpRoomMetadataV2,
+  PvpRoomParticipantMetadataV2,
 } from './types';
 
-export type PvpGuestBridgeConnection = Connection<PvpHostApiV1>;
-
-export type PvpContentSizeObserver = {
-  disconnect(): void;
-  report(): void;
-};
+export type PvpGuestBridgeConnection = Connection<PvpHostApiV2>;
+export type PvpContentSizeObserver = { disconnect(): void; report(): void };
 
 const getAllowedParentOrigins = (): string[] => {
-  if (typeof document === 'undefined' || !document.referrer) {
-    return ['*'];
-  }
-
+  if (typeof document === 'undefined' || !document.referrer) return ['*'];
   try {
     return [new URL(document.referrer).origin];
   } catch {
@@ -36,8 +28,8 @@ const getAllowedParentOrigins = (): string[] => {
   }
 };
 
-export const connectGameToHost = (methods: PvpGuestApiV1): PvpGuestBridgeConnection =>
-  connect<PvpHostApiV1>({
+export const connectGameToHost = (methods: PvpGuestApiV2): PvpGuestBridgeConnection =>
+  connect<PvpHostApiV2>({
     messenger: new WindowMessenger({
       remoteWindow: window.parent,
       allowedOrigins: getAllowedParentOrigins(),
@@ -47,37 +39,33 @@ export const connectGameToHost = (methods: PvpGuestApiV1): PvpGuestBridgeConnect
 
 const getDocumentMinHeight = (): number => {
   const body = document.body;
-  const documentElement = document.documentElement;
-
+  const root = document.documentElement;
   return Math.ceil(
     Math.max(
       body?.scrollHeight ?? 0,
       body?.offsetHeight ?? 0,
-      documentElement.scrollHeight,
-      documentElement.offsetHeight,
+      root.scrollHeight,
+      root.offsetHeight,
     ),
   );
 };
 
 export const reportGameContentSize = async (
-  hostApi: Pick<PvpHostApiV1, 'reportContentSize'> | null | undefined,
+  hostApi: Pick<PvpHostApiV2, 'reportContentSize'> | null | undefined,
 ): Promise<void> => {
   if (typeof document === 'undefined' || !hostApi?.reportContentSize) return;
   await hostApi.reportContentSize({ minHeight: getDocumentMinHeight() });
 };
 
 export const observeGameContentSize = (
-  hostApi: Pick<PvpHostApiV1, 'reportContentSize'> | null | undefined,
+  hostApi: Pick<PvpHostApiV2, 'reportContentSize'> | null | undefined,
 ): PvpContentSizeObserver => {
   let animationFrame = 0;
-
   const report = () => {
     if (typeof window === 'undefined') return;
     window.cancelAnimationFrame(animationFrame);
     animationFrame = window.requestAnimationFrame(() => {
-      void reportGameContentSize(hostApi).catch(() => {
-        /* host may have navigated away */
-      });
+      void reportGameContentSize(hostApi).catch(() => {});
     });
   };
 

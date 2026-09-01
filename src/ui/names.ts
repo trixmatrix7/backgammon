@@ -1,4 +1,13 @@
-import type { LobbyPlayer, PvpHostSnapshotV1 } from "@pvp-sdk";
+import type { LobbyParticipant, PvpHostSnapshotV2 } from "@pvp-sdk";
+
+/**
+ * A seat at the table.
+ *
+ * V2 dropped `LobbySnapshot.players` — the lobby now reports a participant COUNT and
+ * the roster is paged through `getLobbyParticipants`. For a two-seat game that is a
+ * list of two, so the UI keeps thinking in seats and `useParticipants` does the paging.
+ */
+export type Seat = LobbyParticipant;
 
 /** Seat colours. 1v1: seat 0 = ice blue, seat 1 = ember red — the two checker sets, and the accent
  *  every panel, banner and glow for that player is tinted with. */
@@ -28,13 +37,13 @@ export function shortAddress(addr: string): string {
  * The display name for a seat. The host owns identity — there is no "enter your name" field anywhere
  * in this game — so we take its metadata verbatim and only invent something when it sends none.
  */
-export function playerName(p: LobbyPlayer): string {
+export function playerName(p: Seat): string {
   const given = p.metadata?.displayName?.trim() || p.metadata?.username?.trim();
   if (given) return given;
   return import.meta.env.DEV ? hashName(p.address) : shortAddress(p.address);
 }
 
 /** The viewer's own name, which the host may supply separately from the seat metadata. */
-export function viewerName(snapshot: PvpHostSnapshotV1, self?: LobbyPlayer): string {
+export function viewerName(snapshot: PvpHostSnapshotV2, self?: Seat): string {
   return snapshot.metadata?.viewer?.displayName?.trim() || (self ? playerName(self) : "You");
 }

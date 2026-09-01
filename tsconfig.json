@@ -19,8 +19,8 @@
     "baseUrl": ".",
     "paths": {
       "@engine": ["./src/engine/index.ts"],
-      "@pvp-sdk": ["./lib/pvp-sdk/index.ts"],
-      "@pvp-sdk/guest": ["./lib/pvp-sdk/guest.ts"]
+      "@pvp-sdk": ["./lib/pvp-sdk/src/index.ts"],
+      "@pvp-sdk/guest": ["./lib/pvp-sdk/src/guest.ts"]
     }
   },
   "include": ["src", "lib", "test"],

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PvpHostApiV1, PvpHostSnapshotV1, PvpGuestApiV1 } from "@pvp-sdk";
+import type { PvpHostApiV2, PvpHostSnapshotV2, PvpGuestApiV2 } from "@pvp-sdk";
 
 /** Dev-only controls, exposed by the local debug console. `undefined` in production builds. */
 export interface DebugControls {
@@ -20,8 +20,8 @@ export interface DebugControls {
  * appears, so the on-chain path is never affected.
  */
 export function useHost() {
-  const [snapshot, setSnapshot] = useState<PvpHostSnapshotV1 | null>(null);
-  const [hostApi, setHostApi] = useState<PvpHostApiV1 | null>(null);
+  const [snapshot, setSnapshot] = useState<PvpHostSnapshotV2 | null>(null);
+  const [hostApi, setHostApi] = useState<PvpHostApiV2 | null>(null);
   const [mockActive, setMockActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null); // transient toast
 
@@ -30,8 +30,8 @@ export function useHost() {
     if (mockActive) return;
     let alive = true;
     let cleanup = () => {};
-    const guest: PvpGuestApiV1 = {
-      async setState(s) {
+    const guest: PvpGuestApiV2 = {
+      async setState(s: PvpHostSnapshotV2 | null) {
         if (alive) setSnapshot(s);
       },
     };
@@ -41,9 +41,9 @@ export function useHost() {
       let sizer: { disconnect(): void } | null = null;
       conn.promise.then((parent) => {
         if (!alive) return;
-        setHostApi(parent as PvpHostApiV1);
+        setHostApi(parent as PvpHostApiV2);
         // Dynamic iframe sizing (SDK 2026.07.03): the host sizes the frame from the height we report.
-        sizer = observeGameContentSize(parent as PvpHostApiV1);
+        sizer = observeGameContentSize(parent as PvpHostApiV2);
       });
       cleanup = () => {
         sizer?.disconnect();

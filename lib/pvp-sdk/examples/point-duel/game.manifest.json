@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "gameId": "PointDuelGame",
+  "apiVersion": 2,
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "name": "Point Duel",
+      "description": "Each player submits a score; the pot is split between players in proportion to their scores."
+    }
+  },
+  "presentation": {
+    "mode": "full-iframe",
+    "hostPanels": {
+      "lobby": false,
+      "history": false,
+      "status": false
+    }
+  },
+  "lobby": {
+    "access": "public",
+    "entries": "single",
+    "defaultStake": "1000000",
+    "usesLobbyKeys": false
+  },
+  "capabilities": {
+    "createLobby": true,
+    "enterLobby": true,
+    "startLobby": true,
+    "submitAction": true,
+    "cancelLobby": true,
+    "claimWinnings": false,
+    "claimRefund": true,
+    "claimPayout": true,
+    "resize": true
+  }
+}

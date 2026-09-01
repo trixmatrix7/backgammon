@@ -13,8 +13,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@engine": fileURLToPath(new URL("./src/engine/index.ts", import.meta.url)),
-      "@pvp-sdk/guest": fileURLToPath(new URL("./lib/pvp-sdk/guest.ts", import.meta.url)),
-      "@pvp-sdk": fileURLToPath(new URL("./lib/pvp-sdk/index.ts", import.meta.url)),
+      "@pvp-sdk/guest": fileURLToPath(new URL("./lib/pvp-sdk/src/guest.ts", import.meta.url)),
+      "@pvp-sdk": fileURLToPath(new URL("./lib/pvp-sdk/src/index.ts", import.meta.url)),
     },
   },
   test: {

@@ -327,17 +327,41 @@ export interface TableRules {
   matchTo: number;
   cubeOn: boolean;
   officialOpening: boolean;
+  /** What every seat must stake, in token base units. */
+  requiredStake: bigint;
 }
 
-const CONFIG_TUPLE = [{ type: "uint16" }, { type: "uint8" }, { type: "bool" }, { type: "bool" }] as const;
+/**
+ * The table's rules, fixed when the lobby is opened.
+ *
+ * `requiredStake` joined this in the V2 migration. The protocol used to carry a
+ * per-lobby buy-in and check it itself; now a lobby escrows nothing at creation and
+ * every entry names its own stake, so "both seats pay the same" is a rule this GAME has
+ * to state and enforce — which means it has to be written down somewhere both the
+ * client and the contract read. This is that place.
+ */
+const CONFIG_TUPLE = [
+  { type: "uint16" },
+  { type: "uint8" },
+  { type: "bool" },
+  { type: "bool" },
+  { type: "uint256" },
+] as const;
 
 export function encodeConfig(
   turnSec: number,
   matchTo: number = DEFAULT_MATCH_TO,
   cubeOn = false,
   officialOpening = false,
+  requiredStake: bigint | string = 0n,
 ): Hex {
-  return encodeAbiParameters(CONFIG_TUPLE, [turnSec, matchTo, cubeOn, officialOpening] as never);
+  return encodeAbiParameters(CONFIG_TUPLE, [
+    turnSec,
+    matchTo,
+    cubeOn,
+    officialOpening,
+    BigInt(requiredStake),
+  ] as never);
 }
 
 const FALLBACK: TableRules = {
@@ -345,15 +369,16 @@ const FALLBACK: TableRules = {
   matchTo: DEFAULT_MATCH_TO,
   cubeOn: false,
   officialOpening: false,
+  requiredStake: 0n,
 };
 
 export function decodeConfig(data?: Hex): TableRules {
   if (!data || data === "0x") return { ...FALLBACK };
   try {
-    const [turnSec, matchTo, cubeOn, officialOpening] = decodeAbiParameters(
+    const [turnSec, matchTo, cubeOn, officialOpening, requiredStake] = decodeAbiParameters(
       CONFIG_TUPLE,
       data,
-    ) as unknown as [Num, Num, boolean, boolean];
+    ) as unknown as [Num, Num, boolean, boolean, bigint];
     const to = Number(matchTo) || DEFAULT_MATCH_TO;
     return {
       turnSec: Number(turnSec) || DEFAULT_TURN_SEC,
@@ -361,6 +386,7 @@ export function decodeConfig(data?: Hex): TableRules {
       // a single game never carries the cube, whatever the table said
       cubeOn: !!cubeOn && to > 1,
       officialOpening: !!officialOpening,
+      requiredStake: BigInt(requiredStake ?? 0),
     };
   } catch {
     return { ...FALLBACK };

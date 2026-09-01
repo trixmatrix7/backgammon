@@ -1,6 +1,6 @@
 # Randomness → unbiased d6 (PvP games)
 
-**Audience:** Agents and humans implementing **`IPvpGameV1.onRandomness`** or off-chain mirrors (mocks, tests, guest previews).
+**Audience:** Agents and humans implementing **`IPvpGameV2.onRandomness`** or off-chain mirrors (mocks, tests, guest previews).
 
 **Applies to:** Any PvP game that maps facet / VRF **`bytes32`** randomness to **six-sided dice** (faces `1..6`). Examples: dice poker deals, Yahtzee-style re-rolls, any `onPlayerAction` → `WAITING_RANDOMNESS` → `onRandomness` loop.
 
@@ -18,7 +18,7 @@ See the [casino-sdk copy](../casino-sdk/docs/RANDOMNESS_DICE.md) for the bias ta
 
 ---
 
-## PvP lifecycle (`IPvpGameV1`)
+## PvP lifecycle (`IPvpGameV2`)
 
 1. `onPlayerAction` (or `onLobbyStart`) may return `requestRandomnessNow = true` → `WAITING_RANDOMNESS`.
 2. Facet requests RNG; provider fulfills.
@@ -30,7 +30,7 @@ Turn order lives in **`gameState`**; the facet only forwards `msg.sender` — yo
 
 ## Many dice from one word (alternative pattern)
 
-[`solidity/examples/DicePokerGame.sol`](../solidity/examples/DicePokerGame.sol) derives each die as:
+A game that needs many independent dice can derive each die as:
 
 ```solidity
 uint256 word = uint256(keccak256(abi.encode(randomness, player, index)));
@@ -52,17 +52,17 @@ Pick one style per game and use it consistently in contract, mocks, and guest si
 
 ## Agent checklist (PvP-specific)
 
-| DO                                                                              | DON'T                                                     |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Same rejection rules as casino when using raw bytes                             | Assume PvP “doesn’t matter” because it’s not house edge   |
-| Unique `abi.encode` salts per die in keccak-expanded rolls                      | Reuse the same salt for two dice in one roll              |
-| Mirror contract logic in guest mocks before showing outcomes                    | `Math.random()` for pot resolution                        |
-| Keep `DicePokerGame._die` and byte-walk helpers in sync if you fork the example | Mix byte-walk for deal and raw `% 6` on bytes for re-roll |
+| DO                                                           | DON'T                                                     |
+| ------------------------------------------------------------ | --------------------------------------------------------- |
+| Same rejection rules as casino when using raw bytes          | Assume PvP “doesn’t matter” because it’s not house edge   |
+| Unique `abi.encode` salts per die in keccak-expanded rolls   | Reuse the same salt for two dice in one roll              |
+| Mirror contract logic in guest mocks before showing outcomes | `Math.random()` for pot resolution                        |
+| Keep contract, test, and guest die helpers in sync           | Mix byte-walk for deal and raw `% 6` on bytes for re-roll |
 
 ---
 
 ## Related docs
 
 - [`CHAIN_WTF_PVP_GAMES.md`](./CHAIN_WTF_PVP_GAMES.md) — lobby flow + `onRandomness` loops
-- [`PVP_CONTRACT_CONSTRAINTS.md`](./PVP_CONTRACT_CONSTRAINTS.md) — MUST bullet on d6 mapping
+- [`PVP_CONTRACT_CONSTRAINTS.md`](./PVP_CONTRACT_CONSTRAINTS.md) — protocol/game responsibility boundary
 - [`../casino-sdk/docs/RANDOMNESS_DICE.md`](../casino-sdk/docs/RANDOMNESS_DICE.md) — full reference implementations

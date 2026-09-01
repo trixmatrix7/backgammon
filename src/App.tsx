@@ -16,7 +16,9 @@ import { Sound, loadManifest } from "./sound/sounds";
  */
 export function App() {
   const { snapshot, hostApi, debug, notice } = useHost();
-  const mine = snapshot?.lobbies.items.find((l) => l.players.some((p) => p.isYou));
+  // V2: a lobby no longer carries a player list — `viewer` is the connected address's
+  // own participation, present only if it has entered.
+  const mine = snapshot?.lobbies.items.find((l) => l.viewer);
 
   // Standalone / dev only: the host is what normally seats you.
   if (!snapshot || !hostApi) {

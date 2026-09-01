@@ -2,6 +2,141 @@
 
 Versions use `YYYY.MM.DD-N`, where `N` increments when multiple SDK changes ship on the same day.
 
+## 2026.08.31-1
+
+### Added
+
+- Added per-player claim state to **`LobbyParticipant`** (so it appears on `lobby.viewer` and on
+  rows from `getLobbyParticipants`):
+  - **`claimed`** — true once the address has collected at least one claimable-settlement claim.
+  - **`claimedAmount`** — sum of claims already paid to the address.
+  - **`claimedClaimIds`** — the claim ids already collected; check the specific id when a game
+    issues several claims per player. Claim id semantics are game-defined.
+
+  This lets a returning player's game skip a `claimWinnings` transaction it already sent — the
+  settlement alone never said whether the share was collected.
+
+### Compatibility
+
+- Additive and optional: older hosts omit all three fields, and an absent field means "unknown",
+  not "unclaimed" — a resent claim is safe (it reverts as already collected) but wasted.
+
+## 2026.08.30-1
+
+### Added
+
+- Added optional **`PvpHostApiV2.claimPayout({ lobbyId })`** so games can offer collection of an
+  immediate payout whose settlement-time transfer failed (`settlement.immediate.deferred`). The
+  call is permissionless — it always pays the winner recorded at resolution — and resolves with
+  `{ winner, amount, transactionHash }`.
+- Added optional manifest capability **`capabilities.claimPayout`** declaring that the game renders
+  its own collect control for parked payouts; hosts may keep their own fallback control when the
+  flag is absent or false.
+
+### Compatibility
+
+- Additive and optional: feature-detect `host.claimPayout` before calling — older hosts omit it,
+  and manifests without `capabilities.claimPayout` remain valid.
+
+## 2026.08.20-1
+
+### Changed
+
+- **Breaking (contract interface):** `PvpStepResult` now returns **`address[] recipients`** on
+  resolution and no longer declares a settlement mode; the protocol derives it from the length.
+  Exactly **one** recipient settles IMMEDIATE — that address receives the whole distributable pot.
+  Zero (not enumerable) or several recipients settle CLAIMABLE via `getClaim`. The old
+  `ImmediatePayout` amounts arrays and `MAX_IMMEDIATE_RECIPIENTS` are removed (Point Duel now
+  settles via per-participant claims, or immediately when a single player scores).
+- The winner transfer no longer reverts resolution on failure: the payout is parked on the lobby
+  and collected via the new permissionless **`claimPayout(lobbyId)`**; the facet emits
+  `PvpLobbyPayoutDeferred` when this happens.
+- `ImmediatePayoutSnapshot` is now `{ winner, amount, deferred? }`.
+
+## 2026.07.26-1
+
+### Added
+
+- Added transaction hashes to lobby snapshots so games can render real block-explorer `/tx/` links
+  instead of falling back to the game contract's address page:
+  - **`raw.createTransactionHash`** — the transaction that created the lobby.
+  - **`raw.resolveTransactionHash`** — the transaction that resolved the lobby; absent until
+    resolved.
+  - **`raw.randomnessRequests[].transactionHash`** — the VRF fulfillment transaction, per request;
+    absent until that request is fulfilled. Because the `getRandomnessVerification` result extends
+    the request shape, the same hash also appears on each verification entry.
+- Explorer links prove a transaction exists, not that the randomness is fair — keep the client-side
+  `getRandomnessVerification` verdict as the primary fairness signal and treat `/tx/` links as
+  secondary. See `RANDOMNESS_VERIFICATION.md`.
+
+### Compatibility
+
+- Additive and optional: older hosts omit all three fields, and lobbies projected before this
+  version have no hashes (only a re-indexed environment backfills them). Keep an address-link (or
+  no-link) fallback when a hash is absent.
+
+## 2026.07.20-1
+
+### Added
+
+- Added **`raw.randomnessRequests`** to lobby snapshots — every VRF request of the lobby in
+  request order (`{ nonce, requestId, randomness?, fulfilled }`). Per-throw games see one entry
+  per throw; `raw.randomness` / `raw.requestId` keep reflecting only the latest request.
+- Added optional **`PvpHostApiV2.getRandomnessVerification({ lobbyId })`** — the host reads the
+  ECVRF fulfillment artifacts from the Verify Network router and verifies them client-side
+  (proof, output, EIP-712 enclave signature, signer identity). Returns per-request verdicts plus
+  the raw artifacts so the result can be re-verified independently. See
+  `RANDOMNESS_VERIFICATION.md` for the full contract and rendering rules.
+
+### Compatibility
+
+- Additive and optional: feature-detect `host.getRandomnessVerification` before calling; older
+  hosts also omit `raw.randomnessRequests`. On environments without Verify Network (local dev)
+  the method resolves with `supported: false`.
+
+## 2026.07.19-1
+
+### Added
+
+- Added optional **`PvpHostSnapshotV2.ui.viewport.availableHeight`** — the height in px from the
+  top of the game's iframe to the bottom edge of the visible screen, before the user scrolls. Games
+  that want their primary action to land exactly at the screen edge should size the content above
+  it to `availableHeight` minus the action's own height. The value is measured against the small
+  viewport (`svh` semantics), so it stays stable while scrolling collapses mobile browser chrome
+  and only changes on real resizes or orientation changes.
+- CSS viewport units cannot replace this value: the host grows the iframe to fit the game's
+  reported content height, so inside the iframe `100vh` equals the full content height, not the
+  visible screen.
+
+### Compatibility
+
+- Additive and optional: games running against older hosts simply receive no `ui.viewport` and
+  should fall back to their existing layout.
+
+## 2026.07.18-1
+
+### Added
+
+- Added optional **`iconUrl`** to **`PvpAssetBalance`** and **`LobbySnapshot.asset`** — an absolute
+  URL of the token's icon so games can render it next to balances and stakes.
+
+### Compatibility
+
+- Additive and optional: games running against older hosts simply receive no `iconUrl` and should
+  fall back to a text symbol.
+
+## 2026.07.10-1
+
+### Breaking
+
+- Replaced API v1's fixed buy-in, unique seat, creator privilege, `uint8` player cap, and full
+  `players[]` snapshots with the game-policy-oriented API v2 model.
+- Added explicit game-validated entries (including zero and repeated stakes), game-defined positions,
+  optional lobby keys, a protocol-owned contribution ledger, and paginated reads.
+- Added immediate settlement for at most ten recipients and game-computed claimable settlement.
+- Removed vault identity from PvP types; the submitting address is the participant.
+- Replaced `IPvpGameV1` with `IPvpGameV2` and added a scheduled weighted Jackpot reference game.
+
 ## 2026.07.03-1
 
 ### Added

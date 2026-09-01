@@ -1,93 +1,187 @@
-# Smart contract constraints (`PvpGameFacet` + `IPvpGameV1`)
+# Smart contract constraints (`IPvpGameV2` + protocol ledger)
 
 PvP games wager players against each other into a shared pot — **no house liquidity is at risk**, so
 there is no `quoteCaps` / `quoteRiskParams` / reserved-profit machinery (contrast `@chain/casino-sdk`).
-The facet's job is escrow, the protocol fee, and payout distribution. **Turn order is enforced by the
-game, not the facet** (see "Turn order & skipping").
+The protocol's job is escrow, the contribution ledger, the protocol fee, and settlement transfers.
+**Turn order is enforced by the game, not the protocol** (see "Turn order & skipping").
+
+API v2 separates **protocol-owned money/accounting** from **game-owned policy**. The protocol does
+not assume a fixed buy-in, a unique seat per address, a creator privilege, a player cap, or a timeout
+cancellation policy.
+
+The canonical interface lives at [`../solidity/IPvpGameV2.sol`](../solidity/IPvpGameV2.sol).
+
+---
 
 ## Game interface
 
-Your game **must** implement [`IPvpGameV1`](../solidity/IPvpGameV1.sol):
+Your game **must** implement `IPvpGameV2`. All hooks are **`view`** (stateless policy). The protocol
+records contributions, claims, and phase; games read a bounded `LobbyContext` plus ledger views
+through `msg.sender` as `IPvpLobbyLedgerV2`.
 
-- **`canStart(ctx)`** — the game's sole lobby-validation hook (there is **no** `quoteLobby`). Must
-  return `true` before the lobby can leave `WAITING_FOR_PLAYERS`. The creator picks `buyIn` and the
-  seat cap `maxPlayers` at `createLobby`; everything else — minimum players, team parity, and any
-  `config` invariants — is enforced here (or in `onLobbyStart`, which may revert).
-- **`onLobbyStart` / `onPlayerAction` / `onRandomness`** — pure/view step handlers returning a
-  `PvpStepResult` (`nextPhase`, `requestRandomnessNow`, `payout`, `outcome`, `newGameState`). There is
-  no "next actor" field — whose turn it is lives in `gameState`, at the game's discretion.
-- **Unbiased d6 from `bytes32` randomness (MUST)** — If you map facet bytes to faces `1..6` via a
-  **byte walk**, use rejection sampling (`byte < 252` then `(byte % 6) + 1`). **Do not** use raw
-  `(randomness[i] % 6) + 1`. For many dice per fulfillment, you may instead use
-  `keccak256(abi.encode(randomness, uniqueSalt))` then `word % 6` (see
-  [`DicePokerGame.sol`](../solidity/examples/DicePokerGame.sol)); see [`RANDOMNESS_DICE.md`](./RANDOMNESS_DICE.md).
+| Hook             | Responsibility                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `onLobbyOpen`    | Validate asset/config/open data. Optionally assign a non-zero `lobbyKey` unique within this game's namespace.   |
+| `onEntry`        | Accept or reject the caller's explicit stake (including zero) and return a `positionId`. Revert to reject.      |
+| `onLobbyStart`   | Validate the actor and readiness; return the first `PvpStepResult` (state, phase, optional randomness request). |
+| `onPlayerAction` | Apply `actionData` for the forwarded actor. The protocol does **not** check turn order.                         |
+| `onRandomness`   | Consume fulfilled randomness; may return the turn to the same actor via `gameState`.                            |
+| `canCancel`      | Own every normal and recovery cancellation permission. The protocol adds no fill/action timeout.                |
+| `getClaim`       | For claimable settlement, quote one stable `claimId` → recipient + amount from final state.                     |
 
-## Payout-split invariants (enforced by the facet)
+There is **no** `quoteLobby`, **no** protocol `canStart` boolean separate from `onLobbyStart`, and
+**no** vault identity in the participant model — the submitting address is the participant.
 
-When a step returns `nextPhase == RESOLVED`, the facet validates the `PayoutSplit` before moving
-funds. A violation reverts and the lobby stays open/unresolved:
+### Unbiased d6 from `bytes32` randomness (MUST)
 
-- `payout.players.length == payout.shareBps.length` — else `PvpGameFacet__PayoutLengthMismatch`.
-- Every `payout.players[i]` is a current lobby member, with **no duplicates** — else
-  `PvpGameFacet__PayoutNotAMember`.
-- `sum(shareBps) == 10_000` exactly — else `PvpGameFacet__InvalidPayoutSplit`. (Watch integer
-  rounding: assign any dust to one player so the total is exact — see `PointDuelGame._split`.)
-- Distribution: `fee = pot * protocolFeeBps / 10_000`, `distributable = pot - fee`, then each payee
-  receives `distributable * shareBps[i] / 10_000`. Rounding dust from this division stays in the
-  protocol fee account. Members omitted from `players` (or given a 0 share) forfeit their buy-in.
+If you map facet bytes to faces `1..6` via a **byte walk**, use rejection sampling (`byte < 252`
+then `(byte % 6) + 1`). **Do not** use raw `(randomness[i] % 6) + 1`. For many dice per fulfillment,
+you may instead use `keccak256(abi.encode(randomness, uniqueSalt))` then `word % 6`. See
+[`RANDOMNESS_DICE.md`](./RANDOMNESS_DICE.md).
 
-`protocolFeeBps` is a facet-level governance constant (not game-controlled); the game only decides the
-relative split of the distributable pot.
+---
 
-## Facet orchestration
+## Protocol responsibilities
 
-- **Whitelist**: `PvpGameFacet__GameNotWhitelisted` if the game address is not whitelisted
-  (governance). The **stake token** must likewise be on a governance-controlled whitelist
-  (`setPvpTokenWhitelisted`) or `createLobby` reverts with `PvpGameFacet__TokenNotWhitelisted` — this
-  confines stakes to vetted, standard ERC20s so the pot accounting (exact, hook-free transfers) holds.
-- **Vault / buy-in**: the funding vault must be a protocol vault; buy-in is pulled on
-  `createLobby`/`joinLobby`. A min buy-in may be enforced.
-- **Seats**: `joinLobby` reverts if the lobby is full (`PvpGameFacet__LobbyFull`), not in
-  `WAITING_FOR_PLAYERS` (`PvpGameFacet__LobbyNotJoinable`), or the caller already holds a seat
-  (`PvpGameFacet__AlreadyJoined`).
-- **Auto-start**: after a join, if the lobby is full **or** the game's `autoStartWhenFull` /
-  `canStart` allows, the facet runs `onLobbyStart` in the same tx.
-- **Turns are NOT facet-enforced.** `submitAction` forwards `msg.sender` to `onPlayerAction(ctx,
-player, actionData)` and lets the **game** decide what is valid. The facet has no concept of a "next
-  actor" at all — turn order lives entirely in `gameState`. Intentional — see "Turn order & skipping".
-- **Randomness from actions**: any step handler — `onLobbyStart`, **`onPlayerAction`**, or
-  `onRandomness` — may return `requestRandomnessNow = true` with `nextPhase = WAITING_RANDOMNESS`. So
-  a single player's action can trigger a roll, and `onRandomness` can route the next turn back to the
-  same player (decide → randomness → decide again). The randomness provider must be set or
-  `PvpGameFacet__RandomnessProviderNotSet`.
-- **Phases**: invalid transitions revert (`PvpGameFacet__InvalidStepTransition`). You cannot resolve
-  from a terminal phase or request randomness inconsistently.
-- **Simulation**: like casino, the facet may call `onLobbyStart` once as a simulation (`lobbyId == 0`)
-  before committing. Your step handlers must be **view-safe and deterministic** for a given context.
-- **Reentrancy**: every value-moving entrypoint (`createLobby`, `joinLobby`, `leaveLobby`,
-  `startLobby`, `submitLobbyAction`, `onPvpRandomnessFulfilled`, `cancelLobby`) is `nonReentrant`
-  (OpenZeppelin `ReentrancyGuardTransient` — a diamond-safe, EIP-1153 transient guard), layered on
-  checks-effects-interactions ordering (pot/phase finalized before any transfer). Combined with the
-  token whitelist, this protects the pot from reentrancy and malicious-token callbacks.
+- Whitelist the game and the lobby's single immutable ERC20 escrow asset.
+- Store lobby lifecycle state, the game-defined `lobbyKey`, opaque `config`, and opaque `gameState`.
+- Enforce non-zero lobby-key uniqueness within the game contract's namespace.
+- Transfer only the explicit stake authorized by the entering address.
+- Append every accepted entry to the contribution ledger and maintain participant/position aggregates.
+- Expose indexed ledger reads to games and paginated reads to host applications.
+- Request randomness and validate phase transitions.
+- Deduct the protocol fee once at resolution:
+  `fee = pot * protocolFeeBps / 10_000`, `distributable = pot - fee`.
+- Derive the settlement mode from the recipients returned at resolution: exactly **one** recipient
+  is paid the whole distributable pot immediately (a failed transfer is parked for `claimPayout`);
+  zero or several recipients settle via claims.
+- Track collected claim IDs and cap claimable transfers at the remaining distributable pot.
+- On cancellation, make each participant's **full aggregate stake** independently refundable.
+
+`protocolFeeBps` is a protocol-level governance constant (not game-controlled). The game only decides
+who receives the distributable pot and how.
+
+---
+
+## Game responsibilities (money-safety checklist)
+
+- **Phase-gate entries** when your arrays or rules assume a closed set of participants after start
+  (Point Duel reverts unless `ctx.phase == WAITING_FOR_PLAYERS`). The protocol does not invent seats.
+- **Bound player-submitted numbers** that feed sums or multiplications (Point Duel caps scores at
+  `type(uint64).max`) so resolution cannot overflow under Solidity 0.8 checked math and freeze the pot.
+- **Return recipients deliberately**: exactly one recipient means that address is paid the whole
+  distributable pot immediately; return several (or none, when not enumerable) for claimable
+  distributions.
+- **Assign rounding dust deliberately** in claimable splits so claim quotes sum exactly to the
+  distributable pot (Point Duel dust goes to the highest scorer).
+- **Derive lobby keys** from everything that should make a lobby unique (e.g. Jackpot:
+  `keccak256(abi.encode(token, config))`). Do not key only on a timestamp field that another opener
+  can squat.
+- **Treat contribution IDs as dense** `0 .. contributionCount - 1` in append order when walking or
+  binary-searching the ledger (documented on `getContribution`).
+
+---
+
+## Entry and position accounting
+
+Each accepted entry becomes one ledger record:
+
+| Field            | Meaning                                                                      |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `contributionId` | Dense per-lobby 0-based index in append order (`0 .. contributionCount - 1`) |
+| `participant`    | Entering address                                                             |
+| `amount`         | Accepted stake for this entry                                                |
+| `positionId`     | Game-defined position key                                                    |
+| `cumulativePot`  | Pot total after this entry (enables weighted ticket search)                  |
+| `contributedAt`  | Timestamp                                                                    |
+
+Returning the **same** `positionId` aggregates repeated entries into one position. Returning
+**different** IDs keeps them independent.
+
+Examples:
+
+- **Point Duel** — rejects `ParticipantContext.joined == true`; `positionId` is address-derived;
+  fixed exact stake; at most ten participants (game rule bounding score arithmetic).
+- **Jackpot** — accepts repeats; same address-derived `positionId`; minimum stake; time window.
+
+`IPvpLobbyLedgerV2.getContribution(lobbyId, contributionId)` therefore supports ordered index walks
+and binary search over cumulative pots (see `JackpotGame`).
+
+---
+
+## Settlement invariants (enforced by the protocol)
+
+When a step returns `nextPhase == RESOLVED`, the protocol validates settlement before moving funds.
+A violation reverts and the lobby stays unresolved.
+
+### Immediate settlement (derived: exactly one recipient)
+
+- The game returns `recipients` with a single non-zero address, which receives the whole
+  distributable pot (`distributable = pot - fee`).
+- The payout transfer is attempted without reverting: if it fails (e.g. a blacklisted recipient),
+  the payout is parked on the lobby and the winner collects it later via the permissionless
+  `claimPayout(lobbyId)`.
+
+Reference pattern (Jackpot): draw a stake-weighted ticket, return the drawn participant as the only
+recipient.
+
+### Claimable settlement (derived: zero or several recipients)
+
+- No payout loop at resolution; the returned recipients (if enumerated) only select the mode and
+  must contain no zero addresses.
+- Anyone may submit a game-defined `claimId`; the protocol calls `getClaim`, records the ID, and
+  transfers to the returned recipient.
+- The caller **cannot** redirect payment. Multiple claims may share a recipient.
+- Total paid across all claims is capped at the remaining distributable pot.
+
+### Cancellation
+
+`CANCELLED` is **not** a game result. It always means **full refunds** of each participant's
+aggregate stake, claimed independently via the host API / protocol refund path — never a penalty or
+forfeiture. Who may cancel is entirely `canCancel`.
+
+---
+
+## Protocol orchestration notes
+
+- **Whitelist**: game and stake token must be governance-whitelisted so pot accounting stays exact
+  against standard ERC20s.
+- **No stake on open**: opening records config and optional lobby key only. Value moves on
+  **entry**.
+- **Turns are not protocol-enforced.** Submit forwards the actor to `onPlayerAction` and lets the
+  game decide validity. Intentional — see "Turn order & skipping".
+- **Randomness from any step**: `onLobbyStart`, `onPlayerAction`, or `onRandomness` may return
+  `requestRandomnessNow = true` with `nextPhase = WAITING_RANDOMNESS`.
+- **Phases**: invalid transitions revert. You cannot resolve from a terminal phase or request
+  randomness inconsistently.
+- **View safety**: hooks must be deterministic and view-safe for a given context (the protocol may
+  simulate).
+- **Reentrancy**: value-moving entrypoints are non-reentrant and finalize pot/phase before
+  transfers, layered on the token whitelist.
+
+Exact selector names and error codes live on the deployed facet ABI; treat verified bytecode as
+authoritative if this document drifts.
+
+---
 
 ## Turn order & skipping (game-enforced)
 
-Because the facet does not enforce turns, **the game owns all turn logic** in `onPlayerAction`:
+Because the protocol does not enforce turns, **the game owns all turn logic** in `onPlayerAction`:
 
 - A game with turns tracks its current actor (and any sub-turn structure) in `gameState`, and a normal
-  move must `require(player == currentActor)` itself.
+  move must `require(actor == currentActor)` itself.
 - This is what lets an action trigger randomness and then route the **same** player to act again
   (`decide → WAITING_RANDOMNESS → onRandomness keeps currentActor → that player decides again`) — a
-  shape a fixed facet-level turn-guard could not express.
+  shape a fixed protocol-level turn-guard could not express.
 
-**Skipping a slacking player** falls straight out of this and needs **no facet support**:
+**Skipping a slacking player** falls straight out of this and needs **no protocol support**:
 
 1. When the game hands a turn to a player, it writes a deadline into `gameState`
    (`deadline = block.timestamp + timeBank`).
 2. It defines a `SKIP` action whose handler checks `block.timestamp > deadline` (and ignores the
-   caller), then forfeits the no-show — they simply receive a **0 share** at resolution (or are
+   caller), then forfeits the no-show — they simply receive a **0 amount** at resolution (or are
    dropped from the active set) — and advances the turn.
-3. Since the facet forwards **any** caller to `onPlayerAction`, **anyone** (another player, or a
+3. Since the protocol forwards **any** caller to `onPlayerAction`, **anyone** (another player, or a
    keeper bot) can send the `SKIP` tx once the deadline passes; the laggard cannot stall the game.
 
 ```solidity
@@ -95,48 +189,54 @@ Because the facet does not enforce turns, **the game owns all turn logic** in `o
 (uint8 kind) = abi.decode(actionData, (uint8));
 if (kind == SKIP) {
   require(block.timestamp > s.deadline, "not expired"); // caller is irrelevant
-  // forfeit s.currentActor (0 share), advance turn, set s.deadline = block.timestamp + timeBank
+  // forfeit s.currentActor (0 amount), advance turn, set s.deadline = block.timestamp + timeBank
 } else {
-  require(player == s.currentActor, "not your turn");
+  require(actor == s.currentActor, "not your turn");
   require(block.timestamp <= s.deadline, "timed out"); // optional hard cutoff
   // apply move, advance turn, reset deadline (and/or requestRandomnessNow = true)
 }
 ```
 
-The guest decodes the deadline from `raw.gameState` (its own state) to render a countdown and a "skip"
-button — the facet/host has no notion of it. A game that does **not** want permissionless callers may
-additionally `require` membership for non-skip actions — but the skip path should stay open to keep
-the game live.
+The guest decodes the deadline from `raw.gameState` (its own state) to render a countdown and a
+"Skip" button — the protocol/host has no notion of it. A game that does **not** want permissionless
+callers may additionally require membership for non-skip actions — but the skip path should stay open
+to keep the game live.
 
-## Refunds, cancellation, timeouts
+---
 
-| Constant (configurable by governance) | Default      | Meaning                                                                                                                                                                                                   |
-| ------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEFAULT_LOBBY_FILL_TIMEOUT_BLOCKS`   | 43200        | If an open lobby never starts within this window, anyone may `cancelLobby` → refund all buy-ins (the creator may cancel immediately).                                                                     |
-| `DEFAULT_ACTION_TIMEOUT_BLOCKS`       | 43200        | Facet-level **safety net**: the whole lobby stalled with no progress for this long can be unwound via `forfeitExpiredLobby`. Per-turn skipping is normally handled in-game (see "Turn order & skipping"). |
-| `DEFAULT_RANDOMNESS_TIMEOUT_BLOCKS`   | 150          | RNG fulfillment window before stuck-randomness handling.                                                                                                                                                  |
-| `DEFAULT_PROTOCOL_FEE_BPS`            | (governance) | Fee taken from each resolved pot.                                                                                                                                                                         |
+## Cancellation and refunds
 
-- **`leaveLobby`** is only valid in `WAITING_FOR_PLAYERS`; it refunds the caller and frees the seat.
-  The creator leaving may cancel the lobby (refund all) per facet policy.
-- **`cancelLobby` / `forfeitExpiredLobby`** define how stalled games unwind. The default forfeit
-  policy (e.g. award the pot to players who did act, or refund everyone) is a facet/governance
-  decision; the game can also encode an abandonment resolution by returning a `PayoutSplit` from a
-  timeout-aware action path.
+Unlike v1, the protocol does **not** define default fill / action / randomness timeout constants that
+auto-cancel lobbies. Recovery is game policy via `canCancel`:
 
-## Reference implementation
+| Concern                  | v2 approach                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| Lobby never starts       | Game may allow the administrator, opener, or anyone to cancel while waiting                    |
+| Mid-game abandon / stall | Prefer in-game skip + 0 amount at resolution; optional `canCancel` for full unwind             |
+| Stuck randomness         | Protocol/provider operational concern; games should not strand funds on unfulfillable requests |
+| Who gets money on cancel | Always full refund of each participant's aggregate stake — never a partial penalty             |
 
-A working `PvpGameFacet` (diamond facet) lives in the monorepo at
-`packages/contracts/contracts/Pvp/`, with example games (`PointDuelGame`, `CoinDuelGame`), a
-PvP-specific randomness consumer/mock provider, and a test suite at
-`packages/contracts/test/PvpGameFacet.test.ts`.
+There is no protocol `leaveLobby` seat model. Leaving before start is either a game that allows
+cancel/refund patterns or simply not entering again for single-entry games.
 
-Because the casino subsystem already occupies generic selectors on the same diamond (`submitAction`,
-`setRandomnessProvider`, `onRandomnessFulfilled`, …), the PvP facet uses **distinct selectors** —
-`createLobby`, `joinLobby`, `leaveLobby`, `startLobby`, **`submitLobbyAction`**, `cancelLobby`,
-`getLobby`, `setPvpGameWhitelisted`, `setPvpTokenWhitelisted`, `setPvpRandomnessProvider`,
-`setPvpFeeConfig`, and the dedicated randomness callback **`onPvpRandomnessFulfilled`** (via
-`IPvpRandomnessConsumer`). The conceptual
-names used above map onto these; a host integrator calls the prefixed on-chain functions.
+---
 
-Treat the deployed facet's verified ABI as authoritative if this doc drifts.
+## Reference implementations
+
+SDK reference games:
+
+| Contract        | Path                                                                               | Demonstrates                                                                   |
+| --------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `PointDuelGame` | [`../solidity/examples/PointDuelGame.sol`](../solidity/examples/PointDuelGame.sol) | Fixed stake, single entry, phase-gated admission, immediate proportional split |
+| `JackpotGame`   | [`../solidity/examples/JackpotGame.sol`](../solidity/examples/JackpotGame.sol)     | Variable/repeat stakes, lobby keys, weighted ticket via ledger binary search   |
+
+Full protocol facets, when deployed in this monorepo, live under `packages/contracts`. Treat the
+deployed facet's verified ABI as authoritative if this doc drifts.
+
+---
+
+## Related docs
+
+- [`CHAIN_WTF_PVP_GAMES.md`](./CHAIN_WTF_PVP_GAMES.md) — bridge, snapshot, manifest, frontend patterns
+- [`RANDOMNESS_DICE.md`](./RANDOMNESS_DICE.md) — rejection sampling for d6
+- [`VISUAL_AND_UX.md`](./VISUAL_AND_UX.md) — iframe UX expectations

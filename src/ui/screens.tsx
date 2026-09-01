@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatUnits } from "viem";
-import type { PvpHostApiV1, PvpHostSnapshotV1, LobbySnapshot, LobbyPlayer } from "@pvp-sdk";
+import type { PvpHostApiV2, PvpHostSnapshotV2, LobbySnapshot } from "@pvp-sdk";
 import { SINGLE_GAME } from "@engine";
 
 /** The one match length on offer. */
@@ -8,7 +8,8 @@ const BEST_OF_3_POINTS = 3;
 import { encodeConfig, decodeConfig, DEFAULT_TURN_SEC } from "../game/codec";
 import { Sound } from "../sound/sounds";
 import { Coin } from "./Coin";
-import { playerName, seatColor } from "./names";
+import { playerName, seatColor, viewerName, type Seat } from "./names";
+import { useParticipants } from "../sdk/useParticipants";
 import { useSound } from "./useSound";
 import { SoundPanel } from "./SoundPanel";
 
@@ -32,10 +33,13 @@ export function CreateTable({
   hostApi,
   snapshot,
 }: {
-  hostApi: PvpHostApiV1;
-  snapshot: PvpHostSnapshotV1;
+  hostApi: PvpHostApiV2;
+  snapshot: PvpHostSnapshotV2;
 }) {
-  const decimals = snapshot.token.decimals ?? 6;
+  // V2 offers a list of stake assets rather than a single token. This game has one
+  // stake, so it plays on the first the host lists.
+  const asset = snapshot.assets[0];
+  const decimals = asset?.decimals ?? 6;
   const { muted } = useSound();
   const [soundOpen, setSoundOpen] = useState(false);
   const [match, setMatch] = useState(false); // single game is the default
@@ -45,7 +49,7 @@ export function CreateTable({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const balNum = Number(formatUnits(BigInt(snapshot.balances.smartVaultBalance ?? "0"), decimals));
+  const balNum = Number(formatUnits(BigInt(asset?.balance ?? "0"), decimals));
   // The protocol's cut, straight from the host. It is a facet-level setting, not
   // something this game chooses — so it is read and shown, never assumed.
   const feeBps = snapshot.protocol?.feeBps ?? 0;
@@ -61,7 +65,7 @@ export function CreateTable({
   const matchTo = match ? BEST_OF_3_POINTS : SINGLE_GAME;
   // The cube is a match-only rule; a single game switches the whole column off.
   const cubeLive = cubeOn && match;
-  const valid = einsatz > 0 && einsatz <= balNum && snapshot.wallet.status === "ready";
+  const valid = !!asset && einsatz > 0 && einsatz <= balNum && snapshot.wallet.status === "ready";
 
   const create = async () => {
     if (!valid || busy) return;
@@ -71,11 +75,16 @@ export function CreateTable({
     setBusy(true);
     setErr(null);
     try {
-      await hostApi.createLobby({
-        buyIn: String(Math.round(einsatz * 10 ** decimals)),
-        maxPlayers: 2,
-        config: encodeConfig(DEFAULT_TURN_SEC, matchTo, cubeLive, offiziell),
+      // Two steps in V2: opening a lobby escrows nothing, and the creator then enters
+      // it with an explicit stake like anyone else. The required stake travels in the
+      // config so the contract can reject an entry that does not match it — the
+      // protocol no longer carries a per-lobby buy-in of its own.
+      const stake = String(Math.round(einsatz * 10 ** decimals));
+      const { lobbyId } = await hostApi.createLobby({
+        asset: asset!.address,
+        config: encodeConfig(DEFAULT_TURN_SEC, matchTo, cubeLive, offiziell, stake),
       });
+      await hostApi.enterLobby({ lobbyId, stake });
     } catch {
       setErr("Could not open the table — try again.");
       setBusy(false);
@@ -104,7 +113,7 @@ export function CreateTable({
         <div className="neo-bal">
           <span>BALANCE</span>
           <b className="mono">
-            {fmt(snapshot.balances.smartVaultBalance, decimals)} <Coin />
+            {fmt(asset?.balance, decimals)} <Coin />
           </b>
           <span className="snd-anchor">
             <button className="neo-btn sm" onClick={() => setSoundOpen((o) => !o)}>
@@ -274,13 +283,16 @@ export function WaitingRoom({
   snapshot,
   lobby,
 }: {
-  hostApi: PvpHostApiV1;
-  snapshot: PvpHostSnapshotV1;
+  hostApi: PvpHostApiV2;
+  snapshot: PvpHostSnapshotV2;
   lobby: LobbySnapshot;
 }) {
-  const decimals = snapshot.token.decimals ?? 6;
+  const decimals = lobby.asset.decimals ?? 6;
   const cfg = decodeConfig(lobby.raw.config);
-  const seats: Array<LobbyPlayer | null> = [lobby.players[0] ?? null, lobby.players[1] ?? null];
+  const roster = useParticipants(hostApi, lobby);
+  const seats: Array<Seat | null> = [roster[0] ?? null, roster[1] ?? null];
+  // The host may name the viewer separately from their seat metadata.
+  const nameOf = (p: Seat) => (p.isYou ? viewerName(snapshot, p) : playerName(p));
   const [seit, setSeit] = useState(0);
 
   useEffect(() => {
@@ -306,8 +318,8 @@ export function WaitingRoom({
         <div className="neo-waitseats">
           {seats.map((p, i) => (
             <div className={`neo-seat${p ? "" : " leer"}${i === 1 ? " foe" : ""}`} key={i}>
-              <span className="neo-ava">{p ? playerName(p).slice(0, 1).toUpperCase() : "?"}</span>
-              <div className="neo-seatname">{p ? playerName(p) : "Open seat"}</div>
+              <span className="neo-ava">{p ? nameOf(p).slice(0, 1).toUpperCase() : "?"}</span>
+              <div className="neo-seatname">{p ? nameOf(p) : "Open seat"}</div>
               <div className="neo-seatstate">{p ? (p.isYou ? "you" : "ready") : "waiting…"}</div>
             </div>
           ))}
@@ -318,7 +330,7 @@ export function WaitingRoom({
           <b className="mono">
             {fmt(lobby.pot, decimals)} <Coin />
           </b>
-          <i className="mono">Stake each {fmt(lobby.buyIn, decimals)}</i>
+          <i className="mono">Stake each {fmt(String(cfg.requiredStake), decimals)}</i>
         </div>
 
         <p className="neo-waittxt">
@@ -331,7 +343,9 @@ export function WaitingRoom({
             className="neo-btn"
             onClick={() => {
               Sound.play("click");
-              void hostApi.leaveLobby({ lobbyId: lobby.lobbyId });
+              // `leaveLobby` is gone in V2. Cancelling is the way out of a lobby that
+              // never started, and it refunds every participant in full.
+              void hostApi.cancelLobby({ lobbyId: lobby.lobbyId });
             }}
           >
             Close the table
@@ -349,29 +363,60 @@ export function ResultScreen({
   snapshot,
   lobby,
 }: {
-  hostApi: PvpHostApiV1;
-  snapshot: PvpHostSnapshotV1;
+  hostApi: PvpHostApiV2;
+  snapshot: PvpHostSnapshotV2;
   lobby: LobbySnapshot;
 }) {
-  const decimals = snapshot.token.decimals ?? 6;
-  const payout = lobby.payout;
-  const cancelled = lobby.phaseName === "CANCELLED" || !payout;
-  const youIndex = Math.max(
-    0,
-    lobby.players.findIndex((p) => p.isYou),
-  );
-  const draw = !cancelled && !!payout && payout.shareBps[youIndex] === 5000;
-  const youWon = !cancelled && !!payout && payout.shareBps[youIndex] === 10000;
+  const decimals = lobby.asset.decimals ?? 6;
+  const settlement = lobby.settlement;
+  const cancelled = lobby.phaseName === "CANCELLED" || !settlement;
+  const you = snapshot.wallet.address?.toLowerCase();
+
+  // V2 settles by RECIPIENT, not by a share table. One recipient means the pot went
+  // straight to them; anything else is claimable, which for this game only happens when
+  // a match ends level and both sides take half back.
+  const winner = settlement?.immediate?.winner?.toLowerCase();
+  const youWon = !cancelled && settlement?.mode === "IMMEDIATE" && !!you && winner === you;
+  const draw = !cancelled && settlement?.mode === "CLAIMABLE";
+
+  // A win whose transfer failed at resolution is parked on the lobby, and anyone may
+  // push it to the winner. A share of a drawn match has to be collected by its owner.
+  const deferred = !!settlement?.immediate?.deferred;
+  const uncollected = draw && lobby.viewer?.claimed === false;
 
   useEffect(() => {
     Sound.play(youWon ? "victory" : draw ? "turn" : "defeat");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const buyIn = BigInt(lobby.buyIn ?? "0");
-  const youGross = !cancelled && payout?.amounts ? BigInt(payout.amounts[youIndex] ?? "0") : 0n;
-  const net = cancelled ? 0n : youGross - buyIn;
+  const staked = BigInt(lobby.viewer?.totalStake ?? "0");
+  const youGross = youWon ? BigInt(settlement?.immediate?.amount ?? "0") : 0n;
+  const net = cancelled ? 0n : youGross - staked;
   const netNum = Number(formatUnits(net < 0n ? -net : net, decimals));
+
+  const roster = useParticipants(hostApi, lobby);
+  const [collecting, setCollecting] = useState(false);
+
+  const collect = async () => {
+    if (collecting) return;
+    Sound.play("click");
+    setCollecting(true);
+    try {
+      if (deferred && hostApi.claimPayout) {
+        // Optional in the API — feature-detected, because older hosts do not have it.
+        await hostApi.claimPayout({ lobbyId: lobby.lobbyId });
+      } else if (you) {
+        // The claim id is the participant's address, left-padded — the convention the
+        // reference games use and the one this game's `getClaim` decodes.
+        await hostApi.claimWinnings({
+          lobbyId: lobby.lobbyId,
+          claimId: `0x${you.slice(2).padStart(64, "0")}` as `0x${string}`,
+        });
+      }
+    } catch {
+      setCollecting(false);
+    }
+  };
 
   const back = () => {
     Sound.play("click");
@@ -398,25 +443,40 @@ export function ResultScreen({
 
           {!cancelled && (
             <div className="result-board">
-              {lobby.players.map((p, i) => (
-                <div className={`result-row${p.isYou ? " you" : ""}`} key={i}>
-                  <span className="result-swatch" style={{ background: seatColor(i) }} />
-                  <span className="result-name">
-                    {playerName(p)}
-                    {p.isYou ? " (you)" : ""}
-                  </span>
-                  <span className="result-share num">
-                    {payout && payout.shareBps[i] > 0 ? (
-                      <>
-                        {fmt(payout.amounts?.[i], decimals)} <Coin />
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </span>
-                </div>
-              ))}
+              {roster.map((p, i) => {
+                const isWinner = p.address.toLowerCase() === winner;
+                return (
+                  <div className={`result-row${p.isYou ? " you" : ""}`} key={p.address}>
+                    <span className="result-swatch" style={{ background: seatColor(i) }} />
+                    <span className="result-name">
+                      {playerName(p)}
+                      {p.isYou ? " (you)" : ""}
+                    </span>
+                    <span className="result-share num">
+                      {isWinner ? (
+                        <>
+                          {fmt(settlement?.immediate?.amount, decimals)} <Coin />
+                        </>
+                      ) : draw ? (
+                        "half"
+                      ) : (
+                        "—"
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
+          )}
+
+          {/* Money that has been decided but not moved. A win whose transfer failed at
+              resolution is parked and anybody may push it to the winner; a share of a
+              drawn match has to be collected by whoever owns it. Neither is automatic,
+              so neither may be silent. */}
+          {(deferred || uncollected) && (
+            <button className="neo-btn" onClick={collect} disabled={collecting}>
+              <span>{collecting ? "Collecting…" : "Collect your winnings"}</span>
+            </button>
           )}
 
           {!cancelled && !draw && (
