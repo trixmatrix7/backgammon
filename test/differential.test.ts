@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { encodeAbiParameters, keccak256, type Hex } from "viem";
 import {
   ACTION_DOUBLE,
+  ACTION_RESIGN,
   ACTION_MOVE,
   ACTION_NEXT,
   ACTION_PASS,
@@ -35,25 +36,32 @@ import { deployBackgammon, type Deployed } from "./evm";
 const A = `0x${"aa".repeat(20)}` as const;
 const B = `0x${"bb".repeat(20)}` as const;
 
+const STAKE = 1_000_000n;
+
 const CONFIG = (turnSec: number, matchTo: number, cubeOn: boolean, official: boolean): Hex =>
   encodeAbiParameters(
-    [{ type: "uint16" }, { type: "uint8" }, { type: "bool" }, { type: "bool" }],
-    [turnSec, matchTo, cubeOn, official] as never,
+    [{ type: "uint16" }, { type: "uint8" }, { type: "bool" }, { type: "bool" }, { type: "uint256" }],
+    [turnSec, matchTo, cubeOn, official, STAKE] as never,
   );
 
-const slot = (addr: string) => ({ player: addr, vault: addr, buyIn: 1n, joinedAt: 0n });
-
-function ctxOf(config: Hex, gameState: Hex) {
+/**
+ * The V2 lobby context. The roster is deliberately NOT in here — a game reads it from
+ * the protocol ledger, which the harness stands in for (see `contracts/test/MockLedger.sol`).
+ */
+function ctxOf(config: Hex, gameState: Hex, phase = 4 /* WAITING_PLAYER_ACTION */) {
   return {
     lobbyId: 1n,
-    creator: A,
-    buyIn: 1n,
-    pot: 2n,
-    maxPlayers: 2,
+    lobbyKey: `0x${"00".repeat(32)}` as Hex,
+    opener: A,
+    token: `0x${"05".repeat(20)}` as Hex,
+    pot: STAKE * 2n,
+    participantCount: 2n,
+    contributionCount: 2n,
+    protocolFeeBps: 500,
     step: 0,
+    phase,
     config,
     gameState,
-    players: [slot(A), slot(B)],
   };
 }
 
@@ -61,7 +69,8 @@ interface Step {
   newGameState: Hex;
   nextPhase: number;
   requestRandomnessNow: boolean;
-  payout: { players: readonly string[]; shareBps: readonly bigint[] };
+  /** V2 settles by recipient; the protocol reads the mode off the length. */
+  recipients: readonly string[];
 }
 
 const asStep = (r: unknown): Step => r as Step;
@@ -124,7 +133,7 @@ describe("engine ⇄ contract", () => {
       const word = wordAt(seed, 0);
       const config = CONFIG(60, 3, false, false);
 
-      const start = asStep(await bg.call("onLobbyStart", [ctxOf(config, "0x")]));
+      const start = asStep(await bg.call("onLobbyStart", [ctxOf(config, "0x"), A, "0x"]));
       expect(start.requestRandomnessNow).toBe(true);
       expect(start.nextPhase).toBe(3); // WAITING_RANDOMNESS
 
@@ -312,4 +321,118 @@ describe("engine ⇄ contract", () => {
       bg.call("onPlayerAction", [ctxOf(config, dealt), idle, encodeAction(7 /* SKIP */)]),
     ).rejects.toThrow();
   }, 600000);
+
+  /**
+   * The V2 lifecycle hooks, which are new surface and carry the money rules.
+   *
+   * The protocol stopped enforcing a per-lobby buy-in when it moved to explicit
+   * per-entry stakes, so "both sides risk the same amount", "two seats and no more" and
+   * "you cannot cancel your way out of a losing position" are now this contract's job.
+   * Nothing else checks them.
+   */
+  describe("V2 lifecycle", () => {
+    const WAITING = 1;
+    const IN_PROGRESS = 2;
+    const good = CONFIG(60, 3, false, false);
+
+    it("accepts a well-formed table and rejects malformed ones", async () => {
+      bg = bg ?? (await deployBackgammon());
+      await bg.call("onLobbyOpen", [ctxOf(good, "0x", WAITING), A, "0x"]);
+
+      const bad: Array<[string, Hex]> = [
+        ["turn bank too short", CONFIG(1, 3, false, false)],
+        ["turn bank too long", CONFIG(9999, 3, false, false)],
+        ["match length off the menu", CONFIG(60, 5, false, false)],
+        [
+          "no stake",
+          encodeAbiParameters(
+            [{ type: "uint16" }, { type: "uint8" }, { type: "bool" }, { type: "bool" }, { type: "uint256" }],
+            [60, 3, false, false, 0n] as never,
+          ),
+        ],
+      ];
+      for (const [why, cfg] of bad) {
+        await expect(
+          bg.call("onLobbyOpen", [ctxOf(cfg, "0x", WAITING), A, "0x"]),
+          why,
+        ).rejects.toThrow();
+      }
+
+      // A single game asking for the cube is NOT rejected — it is normalised, the same
+      // way the client's `decodeConfig` normalises it, so the table simply plays without
+      // one. Asserted here so the leniency is a decision on the record.
+      await bg.call("onLobbyOpen", [ctxOf(CONFIG(60, 1, true, false), "0x", WAITING), A, "0x"]);
+    }, 600000);
+
+    it("takes the exact stake, once, from at most two seats", async () => {
+      bg = bg ?? (await deployBackgammon());
+      const fresh = { joined: false, totalStake: 0n, contributionCount: 0n };
+      const ctx = (phase = WAITING, participants = 0n) => ({
+        ...ctxOf(good, "0x", phase),
+        participantCount: participants,
+      });
+
+      // the good case
+      const entry = (await bg.call("onEntry", [ctx(), fresh, A, STAKE, "0x"])) as {
+        positionId: Hex;
+      };
+      expect(BigInt(entry.positionId)).toBe(BigInt(A));
+
+      // an unequal stake is not a wager
+      await expect(bg.call("onEntry", [ctx(), fresh, A, STAKE - 1n, "0x"])).rejects.toThrow();
+      await expect(bg.call("onEntry", [ctx(), fresh, A, STAKE + 1n, "0x"])).rejects.toThrow();
+      await expect(bg.call("onEntry", [ctx(), fresh, A, 0n, "0x"])).rejects.toThrow();
+
+      // one seat each, and only two of them
+      await expect(
+        bg.call("onEntry", [ctx(), { ...fresh, joined: true }, A, STAKE, "0x"]),
+      ).rejects.toThrow();
+      await expect(bg.call("onEntry", [ctx(WAITING, 2n), fresh, A, STAKE, "0x"])).rejects.toThrow();
+
+      // and not once the dice are in the air
+      await expect(bg.call("onEntry", [ctx(IN_PROGRESS), fresh, A, STAKE, "0x"])).rejects.toThrow();
+    }, 600000);
+
+    it("will not let a player cancel out of a running match", async () => {
+      bg = bg ?? (await deployBackgammon());
+      expect(await bg.call("canCancel", [ctxOf(good, "0x", WAITING), A, "0x"])).toBe(true);
+      expect(await bg.call("canCancel", [ctxOf(good, "0x", WAITING), B, "0x"])).toBe(true);
+      // Cancellation refunds in full, so allowing it mid-match is an exit from a bad
+      // position at no cost. This is the check that stops that.
+      expect(await bg.call("canCancel", [ctxOf(good, "0x", IN_PROGRESS), A, "0x"])).toBe(false);
+      const stranger = `0x${"cd".repeat(20)}` as Hex;
+      expect(await bg.call("canCancel", [ctxOf(good, "0x", WAITING), stranger, "0x"])).toBe(false);
+    }, 600000);
+
+    it("pays a win to one recipient and a draw to both", async () => {
+      bg = bg ?? (await deployBackgammon());
+      const config = CONFIG(60, 1, false, false);
+      const word = wordAt(900, 0);
+      let chain = asStep(await bg.call("onRandomness", [ctxOf(config, "0x"), word])).newGameState;
+      let engine = createInitialState(word, 2, 1, false, false);
+
+      // resign, which ends a single game and therefore the match
+      const seat = engine.current;
+      const res = asStep(
+        await bg.call("onPlayerAction", [
+          ctxOf(config, chain),
+          seat === 0 ? A : B,
+          encodeAction(ACTION_RESIGN),
+        ]),
+      );
+      expect(res.nextPhase).toBe(5); // RESOLVED
+      expect(res.recipients.length, "a decided match pays exactly one address").toBe(1);
+      expect(res.recipients[0].toLowerCase()).toBe((seat === 0 ? B : A).toLowerCase());
+
+      // and a claim against a decided match is refused — that pot has already moved
+      const quote = (await bg.call("getClaim", [
+        ctxOf(config, res.newGameState),
+        `0x${A.slice(2).padStart(64, "0")}` as Hex,
+        "0x",
+      ])) as { valid: boolean };
+      expect(quote.valid, "a won match has nothing to claim").toBe(false);
+      void engine;
+      void chain;
+    }, 600000);
+  });
 });

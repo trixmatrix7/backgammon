@@ -4,37 +4,42 @@ The Solidity side of Chain Backgammon. The TypeScript engine in `src/engine/` is
 reference implementation; this contract must reproduce it **exactly**, because
 `verifyMatch` replays a finished match and both sides have to agree byte for byte.
 
-Status: **done and passing.** `Backgammon.sol` compiles (13 952 bytes, EIP-170 limit
-24 576) and agrees with the TypeScript engine byte for byte across every case the
-differential harness covers.
+Status: **migrated to SDK V2 and passing.** `Backgammon.sol` implements `IPvpGameV2`
+(16 566 bytes, EIP-170 limit 24 576) and agrees with the TypeScript engine byte for byte
+across every case the differential harness covers.
+
+**What V2 changed, and what it moved onto this contract.** The protocol used to carry a
+per-lobby buy-in and hand the game a roster. It no longer does either:
+
+- Opening a lobby escrows nothing; each entry names its own stake. **"Both sides risk the
+  same amount" is now this contract's rule**, checked in `onEntry` against a
+  `requiredStake` written into the table config. Nothing else checks it.
+- Seat order comes from the protocol ledger, reached through `msg.sender`. Entry order is
+  seat order, and it is the same order the client's roster arrives in.
+- Settlement is by **recipient**, not by a share table. One recipient is paid outright
+  (a decided match); a level match names both seats, which makes it claimable, and
+  `getClaim` hands each of them half.
+- `canCancel` refuses once the match is running. Cancellation refunds in full, so allowing
+  it mid-match would be a free exit from a losing position.
 
 **Coverage.** 12 opening deals; 8 complete matches played end to end, comparing the
-encoded state after every single action; three table rules walked separately (single
-game, cube live, cube live with the official opening) with the cube actually offered,
-taken and dropped; and seven refusal cases where the contract must revert.
+encoded state after every action; three table rules walked separately (single game, cube
+live, cube live with the official opening); seven refusal cases in `onPlayerAction`; and
+the V2 lifecycle — malformed configs, unequal and repeated stakes, the seat cap, entry
+after the start, cancellation mid-match, and the shape of a payout.
 
-**Bugs the harness caught**, none of which would have looked wrong on screen — this is
-the argument for building it:
+**Bugs the harness caught**, none of which would have looked wrong on screen:
 1. `lastResult.cube` must read 1, not 0, before any game has finished.
 2. `seed` is the MATCH seed and must not be rewritten on every throw.
 3. `gameIndex` advances when a game ENDS, not when the next one is dealt.
 4. `lastResult.points` is the total already multiplied by the cube, not the base value.
-5. The LOSER is left on turn at a game boundary — either seat may submit NEXT, and the
-   loser is the one who sets the board up.
+5. The LOSER is left on turn at a game boundary.
 6. `turnIndex` advances and the dice come off the table BEFORE the win is checked.
-7. The OPEN event always reports `cube: 1`, even when the official-opening rule raised
-   the game value.
-8. **Every ordinary transition clears `lastResult`.** The scoreline belongs to the moment
-   between games; once play resumes it is stale. Keeping it was the last divergence.
+7. The OPEN event always reports `cube: 1`.
+8. Every ordinary transition clears `lastResult`.
 9. The opening position had two signs transposed (found by reading, not by the test).
-
-**Running it:**
-```
-npm run build:contracts     # the test refuses stale bytecode rather than rebuilding it
-npx vitest run test/differential.test.ts
-```
-`test/evm.ts` deploys the compiled contract into an in-process EVM (`@ethereumjs/evm`)
-— no node, no chain, no signer, because all four entry points are `view`.
+10. A "cube in a single game" guard that could never fire, because the config decoder had
+    already normalised the cube away — unreachable code dressed as a guarantee.
 
 ---
 

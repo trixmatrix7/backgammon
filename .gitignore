@@ -12,3 +12,6 @@ contracts/lib
 
 .vercel
 .env*
+
+contracts/out
+contracts/src/*.bin

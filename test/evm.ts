@@ -17,6 +17,7 @@ const OUT = fileURLToPath(new URL("../contracts/out/", import.meta.url));
 const SRC = fileURLToPath(new URL("../contracts/src/", import.meta.url));
 const BIN = `${OUT}Backgammon_sol_Backgammon.bin`;
 const ABI_FILE = `${OUT}Backgammon_sol_Backgammon.abi`;
+const LEDGER_BIN = `${OUT}MockLedger_sol_MockLedger.bin`;
 
 /**
  * Load the compiled contract, refusing stale bytecode.
@@ -30,7 +31,7 @@ function build(): { abi: Abi; bytecode: Hex } {
   if (!existsSync(BIN)) {
     throw new Error("contracts not built — run `npm run build:contracts` first");
   }
-  const newer = ["Backgammon.sol", "BackgammonRules.sol", "BackgammonTypes.sol", "IPvpGameV1.sol"]
+  const newer = ["Backgammon.sol", "BackgammonRules.sol", "BackgammonTypes.sol", "IPvpGameV2.sol"]
     .filter((f) => statMtime(`${SRC}${f}`) > statMtime(BIN));
   if (newer.length > 0) {
     throw new Error(
@@ -54,28 +55,38 @@ export interface Deployed {
 
 const CALLER = new Address(hexToBytes(`0x${"11".repeat(20)}`));
 const TARGET = new Address(hexToBytes(`0x${"cc".repeat(20)}`));
+/** Stands in for the facet. See `contracts/test/MockLedger.sol`. */
+const LEDGER = new Address(hexToBytes(`0x${"1e".repeat(20)}`));
 
 export async function deployBackgammon(): Promise<Deployed> {
   const { abi, bytecode } = build();
   const evm = await createEVM();
 
-  const created = await evm.runCall({
-    caller: CALLER,
-    to: undefined,
-    data: hexToBytes(bytecode),
-    gasLimit: 200_000_000n,
-  });
-  if (created.execResult.exceptionError) {
-    throw new Error(`deploy reverted: ${created.execResult.exceptionError.error}`);
-  }
-  await evm.stateManager.putCode(TARGET, created.execResult.returnValue);
+  const deploy = async (code: Hex, at: Address) => {
+    const created = await evm.runCall({
+      caller: CALLER,
+      to: undefined,
+      data: hexToBytes(code),
+      gasLimit: 200_000_000n,
+    });
+    if (created.execResult.exceptionError) {
+      throw new Error(`deploy reverted: ${created.execResult.exceptionError.error}`);
+    }
+    await evm.stateManager.putCode(at, created.execResult.returnValue);
+  };
+
+  await deploy(bytecode, TARGET);
+  // The game reads the roster back from its caller, so the caller has to BE something.
+  await deploy(`0x${readFileSync(LEDGER_BIN, "utf8").trim()}` as Hex, LEDGER);
 
   return {
     abi,
     async call(fn: string, args: unknown[]) {
       const data = encodeFunctionData({ abi, functionName: fn, args } as never);
+      // Sent FROM the ledger, because that is what the game will see as `msg.sender` in
+      // production and what it queries for seats.
       const res = await evm.runCall({
-        caller: CALLER,
+        caller: LEDGER,
         to: TARGET,
         data: hexToBytes(data),
         gasLimit: 500_000_000n,

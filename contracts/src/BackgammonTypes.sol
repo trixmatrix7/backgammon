@@ -119,6 +119,9 @@ library BG {
     uint8 matchTo;
     bool cubeOn;
     bool officialOpening;
+    /// @dev What every seat must stake. The protocol stopped carrying a per-lobby buy-in
+    ///      in V2, so "both sides risk the same" is this game's rule to state and check.
+    uint256 requiredStake;
   }
 
   /// @notice One submitted action. A MOVE carries the WHOLE turn at once, because

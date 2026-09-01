@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IPvpGameV1, LobbyContext, LobbyPhase, PayoutSplit, PvpStepResult} from "./IPvpGameV1.sol";
+import {
+  ClaimQuote,
+  EntryResult,
+  IPvpGameV2,
+  IPvpLobbyLedgerV2,
+  LobbyContext,
+  LobbyOpenResult,
+  LobbyPhase,
+  ParticipantContext,
+  PvpStepResult
+} from "./IPvpGameV2.sol";
 import {BG} from "./BackgammonTypes.sol";
 import {BackgammonRules as R} from "./BackgammonRules.sol";
 
@@ -26,8 +36,12 @@ import {BackgammonRules as R} from "./BackgammonRules.sol";
 ///         **The cube moves points, never money.** A doubling cube multiplies MATCH
 ///         POINTS. The escrow stays winner-takes-all, so no player can ever be exposed
 ///         to more than the buy-in they agreed to.
-contract Backgammon is IPvpGameV1 {
+contract Backgammon is IPvpGameV2 {
   error NotTwoPlayers();
+  error WrongStake();
+  error AlreadyEntered();
+  error LobbyFull();
+  error NotAParticipant();
   error BadConfig();
   error NotYourTurn();
   error WrongPhase();
@@ -39,39 +53,116 @@ contract Backgammon is IPvpGameV1 {
   ///      play at — or one that can never be unstuck.
   uint16 internal constant MIN_TURN_SEC = 15;
   uint16 internal constant MAX_TURN_SEC = 600;
+  uint256 internal constant SEATS = 2;
+  uint256 internal constant BPS = 10_000;
 
-  // ── lobby validation ────────────────────────────────────────────────────────
+  // ── lobby lifecycle ─────────────────────────────────────────────────────────
 
-  /// @inheritdoc IPvpGameV1
-  function canStart(LobbyContext calldata ctx) external pure override returns (bool) {
-    if (ctx.players.length != 2) return false;
-    BG.Config memory cfg = _config(ctx.config);
-    if (cfg.turnSec < MIN_TURN_SEC || cfg.turnSec > MAX_TURN_SEC) return false;
-    // The client offers exactly two lengths. Anything else is a malformed lobby.
-    if (cfg.matchTo != 1 && cfg.matchTo != 3) return false;
-    // The cube is a match-only rule; a single game never carries one.
-    if (cfg.cubeOn && cfg.matchTo == 1) return false;
-    return true;
+  /// @inheritdoc IPvpGameV2
+  /// @dev Nothing is escrowed yet at this point — this only decides whether the table's
+  ///      rules are ones this game will honour.
+  function onLobbyOpen(
+    LobbyContext calldata ctx,
+    address,
+    bytes calldata
+  ) external pure override returns (LobbyOpenResult memory result) {
+    _requireValidConfig(_config(ctx.config));
+    result.newGameState = "";
   }
 
-  /// @inheritdoc IPvpGameV1
+  /// @inheritdoc IPvpGameV2
+  /// @dev The protocol has no per-lobby buy-in any more: every entry names its own
+  ///      stake and the game decides whether to accept it. Backgammon is only a wager
+  ///      if both sides risk the same, so the required amount is fixed in the table's
+  ///      config when the lobby is opened and every seat must match it exactly.
+  function onEntry(
+    LobbyContext calldata ctx,
+    ParticipantContext calldata participant,
+    address entrant,
+    uint256 stake,
+    bytes calldata
+  ) external pure override returns (EntryResult memory result) {
+    if (ctx.phase != LobbyPhase.WAITING_FOR_PLAYERS) revert WrongPhase();
+    if (participant.joined) revert AlreadyEntered();
+    if (ctx.participantCount >= SEATS) revert LobbyFull();
+
+    BG.Config memory cfg = _config(ctx.config);
+    _requireValidConfig(cfg);
+    if (stake != cfg.requiredStake) revert WrongStake();
+
+    // One position per address: this game has no repeated entries to aggregate.
+    result.positionId = bytes32(uint256(uint160(entrant)));
+    result.newGameState = ctx.gameState;
+  }
+
+  /// @inheritdoc IPvpGameV2
   /// @dev Returns no state at all — the opening throw needs randomness, so the match
   ///      begins by asking for it. `onRandomness` recognises the start by the empty
   ///      `gameState` and deals the first game.
-  function onLobbyStart(LobbyContext calldata ctx) external pure override returns (PvpStepResult memory r) {
-    if (ctx.players.length != 2) revert NotTwoPlayers();
-    BG.Config memory cfg = _config(ctx.config);
-    if (cfg.turnSec < MIN_TURN_SEC || cfg.turnSec > MAX_TURN_SEC) revert BadConfig();
-    if (cfg.matchTo != 1 && cfg.matchTo != 3) revert BadConfig();
+  function onLobbyStart(
+    LobbyContext calldata ctx,
+    address actor,
+    bytes calldata
+  ) external view override returns (PvpStepResult memory r) {
+    if (ctx.participantCount != SEATS) revert NotTwoPlayers();
+    _requireValidConfig(_config(ctx.config));
+    // Either player may start a full table; a stranger may not.
+    if (_seatOf(ctx, actor) == type(uint8).max) revert NotAParticipant();
 
     r.newGameState = "";
     r.nextPhase = LobbyPhase.WAITING_RANDOMNESS;
     r.requestRandomnessNow = true;
   }
 
+  /// @inheritdoc IPvpGameV2
+  /// @dev Only before the dice are in the air. Cancellation refunds in full, so allowing
+  ///      it mid-match would hand a losing player a way out of their stake.
+  function canCancel(
+    LobbyContext calldata ctx,
+    address actor,
+    bytes calldata
+  ) external view override returns (bool) {
+    if (ctx.phase != LobbyPhase.WAITING_FOR_PLAYERS) return false;
+    return actor == ctx.opener || _seatOf(ctx, actor) != type(uint8).max;
+  }
+
+  /// @inheritdoc IPvpGameV2
+  /// @dev Only ever reached by a drawn match, which settles CLAIMABLE with both seats as
+  ///      recipients. A win pays its single recipient outright and never comes here.
+  function getClaim(
+    LobbyContext calldata ctx,
+    bytes32 claimId,
+    bytes calldata
+  ) external view override returns (ClaimQuote memory quote) {
+    if (uint256(claimId) > type(uint160).max) return quote;
+    address participant = address(uint160(uint256(claimId)));
+    (bool joined, ) = IPvpLobbyLedgerV2(msg.sender).participantIndex(ctx.lobbyId, participant);
+    if (!joined) return quote;
+
+    BG.State memory s = abi.decode(ctx.gameState, (BG.State));
+    if (!s.over || s.winner >= 0) return quote;
+
+    uint256 distributable = ctx.pot - ((ctx.pot * ctx.protocolFeeBps) / BPS);
+    // Integer division leaves at most one base unit behind; the protocol keeps it rather
+    // than letting one seat quietly take more than half.
+    quote = ClaimQuote({recipient: participant, amount: distributable / SEATS, valid: true});
+  }
+
+  function _requireValidConfig(BG.Config memory cfg) internal pure {
+    if (cfg.turnSec < MIN_TURN_SEC || cfg.turnSec > MAX_TURN_SEC) revert BadConfig();
+    // The client offers exactly two lengths. Anything else is a malformed lobby.
+    if (cfg.matchTo != 1 && cfg.matchTo != 3) revert BadConfig();
+    // A stake of nothing is not a wager, and the whole escrow rests on both sides
+    // putting up the same amount.
+    if (cfg.requiredStake == 0) revert BadConfig();
+    // NB no check for "cube in a single game": `_config` already normalises it away, the
+    // same way `decodeConfig` does on the client, so a table asking for one simply does
+    // not get one. A `revert` here would be unreachable code dressed as a guarantee.
+  }
+
   // ── randomness ──────────────────────────────────────────────────────────────
 
-  /// @inheritdoc IPvpGameV1
+  /// @inheritdoc IPvpGameV2
   /// @dev Three things can be waiting on a word, and the phase says which:
   ///      an empty state means the match is being dealt; `PHASE_GAME_OVER` means the
   ///      next GAME of the match is being dealt; `PHASE_ROLL` means a player has just
@@ -99,7 +190,7 @@ contract Backgammon is IPvpGameV1 {
 
   // ── actions ─────────────────────────────────────────────────────────────────
 
-  /// @inheritdoc IPvpGameV1
+  /// @inheritdoc IPvpGameV2
   /// @dev The facet forwards EVERY caller here — it has no notion of turn order — so
   ///      the ownership check is ours to make. It is deliberately made per action
   ///      rather than once up front, because SKIP is the one action whose whole point
@@ -572,30 +663,29 @@ contract Backgammon is IPvpGameV1 {
 
   /// @dev Winner takes the distributable pot. Points and the cube decided WHO won; they
   ///      never touched how much is at stake.
+  /// @dev V2 settles by RECIPIENT and reads the mode off how many there are. One
+  ///      recipient is paid outright, which is the normal end of a match. A level match
+  ///      names both seats, which makes it claimable, and `getClaim` hands each of them
+  ///      half — there is no share table to express that any more.
   function _resolve(
     BG.State memory s,
     LobbyContext calldata ctx
-  ) internal pure returns (PvpStepResult memory r) {
+  ) internal view returns (PvpStepResult memory r) {
     s.deadline = 0;
     r.newGameState = abi.encode(s);
     r.nextPhase = LobbyPhase.RESOLVED;
 
-    address[] memory who = new address[](2);
-    uint256[] memory bps = new uint256[](2);
-    who[0] = ctx.players[0].player;
-    who[1] = ctx.players[1].player;
-
-    if (s.winner < 0) {
-      // No winner: split it back down the middle rather than stranding the pot.
-      bps[0] = 5000;
-      bps[1] = 5000;
-    } else {
-      uint8 w = uint8(s.winner);
-      bps[w] = 10000;
-      bps[BG.other(w)] = 0;
+    if (s.winner >= 0) {
+      address[] memory one = new address[](1);
+      one[0] = _addressOf(ctx, uint8(s.winner));
+      r.recipients = one;
+      return r;
     }
 
-    r.payout = PayoutSplit({players: who, shareBps: bps});
+    address[] memory both = new address[](2);
+    both[0] = _addressOf(ctx, 0);
+    both[1] = _addressOf(ctx, 1);
+    r.recipients = both;
   }
 
   function _board(BG.State memory s) internal pure returns (R.Board memory b) {
@@ -605,15 +695,14 @@ contract Backgammon is IPvpGameV1 {
   }
 
   function _config(bytes calldata data) internal pure returns (BG.Config memory c) {
-    (uint16 turnSec, uint8 matchTo, bool cubeOn, bool officialOpening) = abi.decode(
-      data,
-      (uint16, uint8, bool, bool)
-    );
+    (uint16 turnSec, uint8 matchTo, bool cubeOn, bool officialOpening, uint256 requiredStake) = abi
+      .decode(data, (uint16, uint8, bool, bool, uint256));
     c = BG.Config({
       turnSec: turnSec,
       matchTo: matchTo,
       cubeOn: cubeOn && matchTo > 1,
-      officialOpening: officialOpening
+      officialOpening: officialOpening,
+      requiredStake: requiredStake
     });
   }
 
@@ -626,10 +715,21 @@ contract Backgammon is IPvpGameV1 {
   }
 
   /// @dev Which seat this address holds, or `type(uint8).max` for a stranger.
-  function _seatOf(LobbyContext calldata ctx, address player) internal pure returns (uint8) {
-    for (uint8 i = 0; i < ctx.players.length; i++) {
-      if (ctx.players[i].player == player) return i;
-    }
-    return type(uint8).max;
+  /// @dev V2 does not put the roster in the context — it lives in the protocol's ledger,
+  ///      which the facet exposes to us as `msg.sender`. Entry order IS seat order, and
+  ///      it is the same order the client's roster comes back in, so seat 0 is the same
+  ///      player on both sides.
+  function _seatOf(LobbyContext calldata ctx, address player) internal view returns (uint8) {
+    (bool joined, uint256 index) = IPvpLobbyLedgerV2(msg.sender).participantIndex(
+      ctx.lobbyId,
+      player
+    );
+    if (!joined || index >= SEATS) return type(uint8).max;
+    return uint8(index);
+  }
+
+  /// @dev The address sitting in a seat.
+  function _addressOf(LobbyContext calldata ctx, uint8 seat) internal view returns (address) {
+    return IPvpLobbyLedgerV2(msg.sender).participantAt(ctx.lobbyId, seat);
   }
 }
