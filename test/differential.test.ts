@@ -88,9 +88,9 @@ function blankDeadline(encoded: Hex): Hex {
   // Every member of the tuple is a static type, so the tuple itself is static and there
   // is NO offset word in front of it — `deadline` is word 14 counting from zero:
   // numPlayers, matchTo, current, phase, cube, cubeOwner, cubeOn, officialOpening,
-  // gameIndex, turnIndex, seq, winner, over, seed, deadline, reserve[0], reserve[1].
+  // gameIndex, turnIndex, seq, winner, over, seed, deadline, warnings[0], warnings[1].
   //
-  // The reserve is blanked for the same reason as the deadline: both are the contract's
+  // The warnings are blanked for the same reason as the deadline: both are the contract's
   // clock, and the engine has no notion of time at all.
   const words = (encoded.slice(2).match(/.{64}/g) ?? []).slice();
   words[14] = "0".repeat(64);
@@ -104,7 +104,7 @@ const FIELDS: string[] = (() => {
   const f = [
     "numPlayers", "matchTo", "current", "phase", "cube", "cubeOwner", "cubeOn",
     "officialOpening", "gameIndex", "turnIndex", "seq", "winner", "over", "seed", "deadline",
-    "reserve[0]", "reserve[1]",
+    "warnings[0]", "warnings[1]",
   ];
   for (let i = 0; i < 24; i++) f.push(`point[${i}]`);
   f.push("bar[0]", "bar[1]", "off[0]", "off[1]", "score[0]", "score[1]", "dice[0]", "dice[1]");
@@ -445,95 +445,91 @@ describe("engine ⇄ contract", () => {
      * The rage quit.
      *
      * A player who closes the tab must not be able to freeze the pot for the other one.
-     * The contract writes a deadline on every hand-over and lets ANY caller claim the
-     * match once it passes — which is also why the check below is on the clock and not
-     * on who is asking.
+     * The contract writes a deadline on every hand-over and lets ANY caller act on it
+     * once it passes — which is why the check below is on the clock, not on who is
+     * asking. The full walk to a forfeit is covered by the warnings test; this one is
+     * about who is allowed to start it.
      */
-    it("lets the abandoned player claim the match once the clock runs out", async () => {
+    it("lets anyone act on an expired clock, but not before", async () => {
       bg = bg ?? (await deployBackgammon());
       const config = CONFIG(60, 3, false, false);
       const word = wordAt(910, 0);
       const dealt = asStep(await bg.call("onRandomness", [ctxOf(config, "0x"), word])).newGameState;
       const engine = createInitialState(word, 2, 3, false, false);
-      const onRoll = engine.current;
-      const idle = onRoll === 0 ? B : A;
+      const idle = engine.current === 0 ? B : A;
       const skip = encodeAction(7 /* SKIP */);
 
-      // The deadline was stamped from the block clock, so nothing has expired yet.
       await expect(
         bg.call("onPlayerAction", [ctxOf(config, dealt), idle, skip]),
-        "cannot be claimed before the clock runs out",
+        "cannot be acted on before the clock runs out",
       ).rejects.toThrow();
 
-      // Well past it. The turn bank is 60s and the deal stamped it at timestamp 0.
       const late = 10_000n;
-      const claimed = asStep(await bg.call("onPlayerAction", [ctxOf(config, dealt), idle, skip], late));
-      expect(claimed.nextPhase, "the match resolves").toBe(5);
-      expect(claimed.recipients.length, "one winner, paid outright").toBe(1);
-      expect(
-        claimed.recipients[0].toLowerCase(),
-        "the pot goes to whoever did NOT run out of time",
-      ).toBe(idle.toLowerCase());
+      const byOpponent = asStep(await bg.call("onPlayerAction", [ctxOf(config, dealt), idle, skip], late));
+      expect(decodeState(byOpponent.newGameState).warnings[engine.current]).toBe(1);
 
-      // And a stranger may do it too: the point is to keep the pot moving, not to
-      // reward whoever is watching.
+      // A stranger may do it too: the point is to keep the pot moving, not to reward
+      // whoever happens to be watching.
       const stranger = `0x${"cd".repeat(20)}` as Hex;
       const byStranger = asStep(
         await bg.call("onPlayerAction", [ctxOf(config, dealt), stranger, skip], late),
       );
-      expect(byStranger.recipients[0].toLowerCase()).toBe(idle.toLowerCase());
+      expect(decodeState(byStranger.newGameState).warnings[engine.current]).toBe(1);
     }, 600000);
 
     /**
-     * The reserve.
+     * Two warnings, then the match.
      *
-     * A 45-second turn clock on its own punishes the wrong person: a player sitting right
-     * there, thinking about a doubles turn, loses the match to someone who only had to
-     * wait. The reserve is what separates "thinking" from "gone" — it is spent only by the
-     * part of a turn that overruns the bank, and only when it is empty does the clock
-     * actually run out.
+     * A bare turn clock punishes the wrong person: someone sitting right there, working
+     * out a doubles turn, loses to an opponent who only had to wait. So the first two
+     * overruns are warnings — they cost the laggard one of their allowance and buy a
+     * fresh turn — and only the third ends it. That still bounds a genuine walk-out at
+     * three turn banks rather than leaving the pot frozen.
      */
-    it("spends the reserve on a long think, and only then runs out", async () => {
+    it("warns twice before a clock overrun ends the match", async () => {
       bg = bg ?? (await deployBackgammon());
-      const TURN = 60n;
-      const config = CONFIG(Number(TURN), 3, false, false);
+      const TURN = 60;
+      const config = CONFIG(TURN, 3, false, false);
       const word = wordAt(920, 0);
 
-      const dealt = asStep(await bg.call("onRandomness", [ctxOf(config, "0x"), word])).newGameState;
+      let chain = asStep(await bg.call("onRandomness", [ctxOf(config, "0x"), word])).newGameState;
       const engine = createInitialState(word, 2, 3, false, false);
-      const opener = engine.current === 0 ? A : B;
       const idle = engine.current === 0 ? B : A;
+      const skip = encodeAction(7 /* SKIP */);
 
-      const start = decodeState(dealt);
-      expect(start.reserve, "both sides open with a full reserve").toEqual([120, 120]);
-      // The deadline already contains the reserve: bank + reserve from a zero block clock.
-      expect(start.deadline).toBe(Number(TURN) + 120);
+      expect(decodeState(chain).warnings, "both sides open with a full allowance").toEqual([2, 2]);
 
-      // Forty seconds past the bank — well inside the reserve, so no claim yet.
+      // Nothing is owed while the clock is still running.
       await expect(
-        bg.call("onPlayerAction", [ctxOf(config, dealt), idle, encodeAction(7)], 100n),
-        "a long think is not an abandoned match",
+        bg.call("onPlayerAction", [ctxOf(config, chain), idle, skip], 10n),
+        "cannot be poked before the clock runs out",
       ).rejects.toThrow();
 
-      // Play the turn at that same moment; the overrun comes out of the reserve.
-      const pick = legalTurns(engine)[0];
-      const after = asStep(
-        await bg.call(
-          "onPlayerAction",
-          [ctxOf(config, dealt), opener, encodeAction(ACTION_MOVE, pick)],
-          100n,
-        ),
-      ).newGameState;
-      const spent = decodeState(after);
-      expect(spent.reserve[engine.current], "40s over the bank costs 40s of reserve").toBe(80);
-      expect(spent.reserve[engine.current ^ 1], "the other side is untouched").toBe(120);
+      // First overrun: a warning, a fresh clock, and the match carries on.
+      let at = 100n;
+      let step1 = asStep(await bg.call("onPlayerAction", [ctxOf(config, chain), idle, skip], at));
+      expect(step1.nextPhase, "still playing").toBe(4);
+      let st = decodeState(step1.newGameState);
+      expect(st.warnings[engine.current]).toBe(1);
+      expect(st.deadline, "a fresh turn bank").toBe(Number(at) + TURN);
+      expect(st.state.current, "and it is still their turn").toBe(engine.current);
+      chain = step1.newGameState;
 
-      // Past bank AND reserve, the match really is abandoned.
-      const claimed = asStep(
-        await bg.call("onPlayerAction", [ctxOf(config, dealt), idle, encodeAction(7)], 181n),
-      );
-      expect(claimed.nextPhase, "bank and reserve both gone").toBe(5);
-      expect(claimed.recipients[0].toLowerCase()).toBe(idle.toLowerCase());
+      // Second overrun: last warning.
+      at = 200n;
+      step1 = asStep(await bg.call("onPlayerAction", [ctxOf(config, chain), idle, skip], at));
+      expect(step1.nextPhase).toBe(4);
+      st = decodeState(step1.newGameState);
+      expect(st.warnings[engine.current]).toBe(0);
+      expect(st.warnings[engine.current ^ 1], "the other side is untouched").toBe(2);
+      chain = step1.newGameState;
+
+      // Third: the match is over, and it goes to whoever did not run out of time.
+      const done = asStep(await bg.call("onPlayerAction", [ctxOf(config, chain), idle, skip], 300n));
+      expect(done.nextPhase, "resolved").toBe(5);
+      expect(done.recipients.length).toBe(1);
+      expect(done.recipients[0].toLowerCase()).toBe(idle.toLowerCase());
     }, 600000);
+
   });
 });

@@ -26,7 +26,7 @@ export function PlayerCard({
   score,
   matchTo,
   secondsLeft,
-  inReserve,
+  warnings,
   holdsCube,
   cube,
 }: {
@@ -39,8 +39,8 @@ export function PlayerCard({
   score: number;
   matchTo: number;
   secondsLeft: number | null;
-  /** True once the per-turn bank is gone and the match reserve is paying for the turn. */
-  inReserve: boolean;
+  /** Clock overruns this side may still survive before forfeiting the match. */
+  warnings: number;
   holdsCube: boolean;
   cube: number;
 }) {
@@ -83,12 +83,23 @@ export function PlayerCard({
           // meant a player sitting right there, thinking, could lose the match with no
           // signal at all that it was coming. Below a minute it turns; below fifteen
           // seconds it beats.
-          <div className={`ft${secondsLeft <= 60 ? " warn" : ""}${secondsLeft <= 15 ? " urgent" : ""}`}>
-            <span>{inReserve ? "Reserve" : "Clock"}</span>
+          <div className={`ft${secondsLeft <= 20 ? " warn" : ""}${secondsLeft <= 10 ? " urgent" : ""}`}>
+            <span>Clock</span>
             <b className="num">{clock(secondsLeft)}</b>
           </div>
         )}
       </div>
+
+      {/* Warnings left, as pips. Two mean the clock running out costs nothing yet; none
+          mean the next overrun ends the match. Shown for BOTH sides, because knowing
+          where your opponent stands is part of the decision to press the button. */}
+      {warnings < 2 && (
+        <div className="neo-warns" title={`${warnings} warning${warnings === 1 ? "" : "s"} left`}>
+          {[0, 1].map((i) => (
+            <i key={i} className={i < warnings ? "" : "spent"} />
+          ))}
+        </div>
+      )}
 
       {holdsCube && (
         <span className="neo-cube-chip" title="Only the owner may double next">

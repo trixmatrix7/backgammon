@@ -47,11 +47,11 @@ export const STATE_TUPLE = [
       { name: "over", type: "bool" },
       { name: "seed", type: "bytes32" },
       { name: "deadline", type: "uint64" },
-      // Seconds of thinking time each side still has in hand beyond the per-turn bank.
-      // Neither this nor `deadline` is part of the engine's state — the engine knows
-      // nothing about time. Both belong to the contract and are carried here so the
+      // How many times each side may still let the clock run out before losing the
+      // match. Neither this nor `deadline` is part of the engine's state — the engine
+      // knows nothing about time. Both belong to the contract and ride along here so the
       // client can show them.
-      { name: "reserve", type: "uint16[2]" },
+      { name: "warnings", type: "uint8[2]" },
       { name: "points", type: "int8[24]" }, // + = seat 0 checkers, − = seat 1 checkers
       { name: "bar", type: "uint8[2]" },
       { name: "off", type: "uint8[2]" },
@@ -95,7 +95,7 @@ const pad4 = (xs: number[]): [number, number, number, number] => [xs[0] ?? 0, xs
 export function encodeState(
   s: GameState,
   deadlineSec: number,
-  reserve: [number, number] = [0, 0],
+  warnings: [number, number] = [0, 0],
 ): Hex {
   const e = s.lastEvent;
   const r = s.lastResult;
@@ -116,7 +116,7 @@ export function encodeState(
       over: s.over,
       seed: s.seed,
       deadline: BigInt(deadlineSec),
-      reserve,
+      warnings,
       points: s.points,
       bar: s.bar,
       off: s.off,
@@ -165,7 +165,7 @@ interface WireTuple {
   over: boolean;
   seed: Hex;
   deadline: bigint;
-  reserve: readonly Num[];
+  warnings: readonly Num[];
   points: readonly Num[];
   bar: readonly Num[];
   off: readonly Num[];
@@ -197,8 +197,8 @@ interface WireTuple {
 export function decodeState(data: Hex): {
   state: GameState;
   deadline: number;
-  /** Seconds of reserve left, per seat. */
-  reserve: [number, number];
+  /** Clock overruns each seat may still survive, per seat. */
+  warnings: [number, number];
 } {
   const [t] = decodeAbiParameters(STATE_TUPLE, data) as unknown as [WireTuple];
 
@@ -256,7 +256,7 @@ export function decodeState(data: Hex): {
       lastResult,
     },
     deadline: Number(t.deadline),
-    reserve: [Number(t.reserve?.[0] ?? 0), Number(t.reserve?.[1] ?? 0)],
+    warnings: [Number(t.warnings?.[0] ?? 0), Number(t.warnings?.[1] ?? 0)],
   };
 }
 

@@ -40,6 +40,9 @@ import { PlayerCard } from "./PlayerCard";
 import { RulesSheet } from "./RulesModal";
 import { INTRO_KEY, IntroSheet } from "./IntroSheet";
 import { playerName, viewerName } from "./names";
+
+/** The other seat. */
+const BG_OTHER = (seat: number) => seat ^ 1;
 import { useParticipants } from "../sdk/useParticipants";
 import { fmt } from "./format";
 import { useMatchAnimator } from "./useMatchAnimator";
@@ -64,9 +67,9 @@ export function MatchScreen({
   const decoded = useMemo(() => decodeState(lobby.raw.gameState!), [lobby.raw.gameState]);
   const auth = decoded.state;
   const deadline = decoded.deadline;
-  // The contract's clock, not the engine's — the engine has no notion of time. `reserve`
-  // is what is left of each side's match allowance; the deadline already includes it.
-  const reserve = decoded.reserve;
+  // The contract's clock, not the engine's — the engine has no notion of time.
+  // `warnings` is how many more overruns each side survives before forfeiting.
+  const warnings = decoded.warnings;
 
   const { view, anim, animating } = useMatchAnimator(auth);
   // V2: the roster is fetched, not carried on the lobby. Entry order IS seat order —
@@ -563,10 +566,13 @@ export function MatchScreen({
    * to end the match. This is that way.
    */
   const foeAbandoned = seated && !over && !yourTurn && !animating && remaining <= 0;
+  const foeWarnings = warnings[BG_OTHER(yourSeat)];
 
   const cta = foeAbandoned
     ? {
-        label: "Claim the win",
+        // The button says what pressing it will actually do. The first two calls cost
+        // the opponent a warning and give them a fresh clock; only the last one ends it.
+        label: foeWarnings > 0 ? "Warn opponent" : "Claim the win",
         on: () => {
           Sound.play("click");
           submit(SKIP);
@@ -605,7 +611,7 @@ export function MatchScreen({
             score={view.score[seat]}
             matchTo={view.matchTo}
             secondsLeft={seat === view.current && !over ? remaining : null}
-            inReserve={seat === view.current && remaining <= reserve[seat]}
+            warnings={warnings[seat]}
             holdsCube={view.cubeOwner === seat}
             cube={view.cube}
           />

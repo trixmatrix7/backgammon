@@ -240,7 +240,7 @@ export class MockHost {
     this.paidOut = false;
     this.emit();
     this.matchTimer = setTimeout(() => {
-      if (this.match) this.match.deadline = Date.now() + this.match.turnMs + this.match.reserve[HUMAN] * 1000;
+      if (this.match) this.match.deadline = Date.now() + this.match.turnMs;
       this.loop();
     }, SETUP_MS);
   }
@@ -294,23 +294,21 @@ export class MockHost {
     // only in the contract, so the mock has to reproduce it, deadline check and all.
     if (kind === SKIP) {
       if (Date.now() <= m.deadline) return;
-      this.forfeit(m.es.current);
+      const late = m.es.current;
+      if (m.warnings[late] > 0) {
+        m.warnings[late] -= 1;
+        m.deadline = Date.now() + m.turnMs;
+        this.emit();
+        this.loop();
+        return;
+      }
+      this.forfeit(late);
       return;
     }
 
     const action = toEngineAction(kind, moves);
     // NEXT may come from either seat; everything else has to be the human's own turn.
     if (action.type !== "next" && m.es.current !== HUMAN) return;
-    // Charge the part of the turn that ran past the bank to the reserve, exactly as the
-    // contract does — the deadline already contains the reserve, so the bank ran out at
-    // `deadline - reserve`.
-    const held = m.reserve[HUMAN] * 1000;
-    const bankRanOutAt = m.deadline - held;
-    if (held > 0 && Date.now() > bankRanOutAt) {
-      const overrun = Date.now() - bankRanOutAt;
-      m.reserve[HUMAN] = Math.max(0, Math.round((held - overrun) / 1000));
-    }
-
     const before = m.es.seq;
     if (this.matchTimer) clearTimeout(this.matchTimer);
     step(m, action.type === "next" ? m.es.current : HUMAN, action, randSeed());
@@ -334,6 +332,23 @@ export class MockHost {
   private humanTimeout() {
     const m = this.match;
     if (!m || m.winner !== null || m.es.current !== HUMAN) return;
+
+    // Two warnings before anything is taken. Same rule the contract applies when the
+    // opponent pokes an expired clock — here the bot does the poking, as a real
+    // opponent would.
+    if (m.warnings[HUMAN] > 0) {
+      m.warnings[HUMAN] -= 1;
+      m.deadline = Date.now() + m.turnMs;
+      this.onNotice?.(
+        m.warnings[HUMAN] === 1
+          ? "Time's up — first warning. One more and the match is forfeit."
+          : "Time's up — last warning. The next one forfeits the match.",
+      );
+      this.emit();
+      this.loop();
+      return;
+    }
+
     this.onNotice?.("Time's up — your opponent claimed the match.");
     this.forfeit(HUMAN);
   }
@@ -381,11 +396,7 @@ export class MockHost {
 
     if (cur === HUMAN) {
       // The clock covers the whole turn (cube decision, roll and move), not each step of it.
-      // The clock covers the whole turn AND whatever reserve the player still holds, so
-      // the deadline is the real drop-dead time — same shape as the contract's.
-      if (newTurn || es.phase === PHASE_CUBE) {
-        m.deadline = Date.now() + m.turnMs + m.reserve[HUMAN] * 1000;
-      }
+      if (newTurn || es.phase === PHASE_CUBE) m.deadline = Date.now() + m.turnMs;
       this.emit();
       const ms = Math.max(900, m.deadline - Date.now());
       this.matchTimer = setTimeout(() => {
@@ -477,7 +488,7 @@ export class MockHost {
       raw: {
         config: encodeConfig(rec.turnSec, rec.matchTo, rec.cubeOn, rec.officialOpening, rec.buyIn),
         gameState: isActive
-          ? encodeState(this.match!.es, Math.floor(this.match!.deadline / 1000), this.match!.reserve)
+          ? encodeState(this.match!.es, Math.floor(this.match!.deadline / 1000), this.match!.warnings)
           : undefined,
       },
     };

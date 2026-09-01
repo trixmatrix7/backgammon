@@ -1540,3 +1540,21 @@ body { overflow: hidden; }
   0%, 60% { opacity: 1; }
   61%, 100% { opacity: 0.35; }
 }
+
+/* Warnings left on the clock. Only drawn once one has been spent — a full allowance is
+   the normal state and does not need saying. */
+.neo-warns {
+  position: absolute;
+  right: 0.7cqw;
+  bottom: 0.7cqw;
+  display: flex;
+  gap: 0.3cqw;
+}
+.neo-warns i {
+  width: 0.55cqw;
+  height: 0.55cqw;
+  border-radius: 50%;
+  background: var(--hot);
+  border: 0.12cqw solid var(--ink);
+}
+.neo-warns i.spent { background: transparent; }
