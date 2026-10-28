@@ -27,3 +27,7 @@ To list the cover in the host catalog, the manifest needs `"assets": { "coverUrl
 — a field of manifest schema version 2 (`public/game.manifest.json` is still version 1).
 
 Originals (PNG): kept outside the repository.
+
+## Card without title (28 Oct 2026)
+
+`public/art/gamecard-4x5.webp` (1122×1402) now holds a card without lettering. The chain.wtf lobby lays its own title over the top of the card (with a two-line title down to about 26 %), a Live badge above it and its VIEW GAME button over the bottom (86–94 %), and shows the card at about 0.72:1, so the card carries no lettering, the top centre stays naturally calm and the figures sit between about 30 and 80 % of the height. GPT Image 2.5 (Higgsfield) job `94288741-2f1d-4e63-bbe2-84bc8c069a1e` (1792×2240, scaled uncropped), painted from the titled card above and the game's own board, checkers and dice. The square cover is unchanged.
